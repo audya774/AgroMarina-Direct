@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* -------------------------------------------------------------------------- */
+/* KUSTOMISASI ANIMASI (Untuk Sidebar Keranjang Belanja)                      */
+/* -------------------------------------------------------------------------- */
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* -------------------------------------------------------------------------- */
+/* KUSTOMISASI SCROLLBAR (Agar Market Ticker & Halaman Lebih Clean)          */
+/* -------------------------------------------------------------------------- */
+/* Mengubah ukuran scrollbar horizontal pada market ticker */
+::-webkit-scrollbar {
+  height: 4px;
+  width: 6px;
+}
+
+/* Warna jalur scrollbar */
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+/* Warna batang penunjuk scrollbar */
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px; /* Tambahan sedikit agar scrollbar lebih membulat dan rapi */
+}
+
