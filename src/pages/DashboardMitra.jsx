@@ -23,16 +23,11 @@ const DashboardMitra = () => {
       setProducts(data || []);
     }
   };
-      const handleHapus = async (id, namaHasil) => {
+    const handleHapus = async (id, namaHasil) => {
     const konfirmasi = window.confirm(`Apakah Anda yakin ingin menghapus ${namaHasil}?`);
-      const filteredProducts = products.filter((p) => {
-    if (filterCategory === 'Semua') return true;
-    return p.category?.toLowerCase() === filterCategory.toLowerCase();
-  });
-    if (!konfirmasi) ;return
-
+    if (!konfirmasi) return;
     try {
-      const { error } = await supabase.from('Hasil').delete().eq('id', id);
+      const { error } = await supabase.from('Hasil').delete().eq('name', id);
       if (error) throw error;
       
       setProducts(products.filter((p) => p.id !== id));
@@ -44,10 +39,10 @@ const DashboardMitra = () => {
 
     const handleEdit = async (id, hargaSaatIni, namaHasil) => {
     const hargaBaru = window.prompt(`Masukkan harga baru untuk ${namaHasil} (tanpa titik/koma):`, hargaSaatIni);
-    if (hargaBaru === null || hargaBaru === hargaSaatIni) ; 
+      if (hargaBaru === null || hargaBaru === hargaSaatIni) return; 
 
     try {
-      const { error } = await supabase.from('Hasil').update({ price: hargaBaru }).eq('id', id);
+      const { error } = await supabase.from('Hasil').update({ price: hargaBaru }).eq('name', id);
       if (error) throw error;
       
       setProducts(products.map((p) => p.id === id ? { ...p, price: hargaBaru } : p));
@@ -64,7 +59,7 @@ const DashboardMitra = () => {
   useEffect(() => {
     const handleBuka = () => setIsOpen(true);
     window.addEventListener('buka', handleBuka);
-     () => window.removeEventListener('buka', handleBuka);
+    return () => window.removeEventListener('buka', handleBuka);
   }, []);
 
   const targetPhone = "6281361293319";
@@ -106,10 +101,10 @@ Mohon dibantu prosesnya. Terima kasih!`);
     loadProfile();
   }, []);
 
-  const handleUploadFoto = async (event) => {
+    const handleUploadFoto = async (event) => {
     const file = event.target.files[0];
-    if (!file) ;
-
+    if (!file) return;
+    
     try {
       setIsUploading(true);
       
@@ -153,8 +148,14 @@ Mohon dibantu prosesnya. Terima kasih!`);
     setIsOpen(false);
   };
 
-   (
+  const filteredProducts = products.filter((p) => {
+    if (filterCategory === 'Semua') return true;
+    return p.category?.toLowerCase() === filterCategory.toLowerCase();
+  });
+
+  return (
     <div className="flex h-screen overflow-hidden bg-gray-50 relative">
+
       
       {/* =========================================
           LAYAR PENUH FOTO PROFIL (MODAL/OVERLAY)
@@ -315,28 +316,42 @@ Mohon dibantu prosesnya. Terima kasih!`);
               <h1 className="text-2xl font-extrabold text-[#1E293B]">Selamat Datang, Mitra!</h1> 
               <p className="text-gray-500 mt-1">Berikut adalah daftar produk yang Anda kelola di AgroMarina.</p>
             </div>
-          
-         <div className="flex gap-3 overflow-x-auto pb-2 mt-6">
+            
+            <div className="flex justify-center items-center gap-2 w-full mt-6 px-2">
               <button 
                 onClick={() => setFilterCategory('Semua')} 
-                className={`px-5 py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${filterCategory === 'Semua' ? 'bg-[#0F172A] text-white shadow-md' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
+                className={`flex-1 max-w-[120px] text-center py-2.5 rounded-xl font-bold text-xs transition-all shadow-sm border ${
+                  filterCategory === 'Semua' 
+                    ? 'bg-[#0F172A] text-white border-[#0F172A]' 
+                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                }`}
               >
-                Semua Hasil
+                Semua
               </button>
+              
               <button 
                 onClick={() => setFilterCategory('Agro')} 
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${filterCategory === 'Agro' ? 'bg-white border-2 border-[#10B981] text-[#10B981] shadow-sm' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
+                className={`flex-1 max-w-[120px] flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-bold text-xs transition-all shadow-sm border ${
+                  filterCategory === 'Agro' 
+                    ? 'bg-[#10B981] text-white border-[#10B981]' 
+                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                }`}
               >
-                <Leaf className="w-4 h-4" /> Agro
+                <Leaf className="w-3.5 h-3.5" /> Agro
               </button>
+              
               <button 
                 onClick={() => setFilterCategory('Marine')} 
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${filterCategory === 'Marine' ? 'bg-white border-2 border-slate-700 text-slate-700 shadow-sm' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
+                className={`flex-1 max-w-[120px] flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-bold text-xs transition-all shadow-sm border ${
+                  filterCategory === 'Marine' 
+                    ? 'bg-blue-600 text-white border-blue-600' 
+                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                }`}
               >
-                <Anchor className="w-4 h-4" /> Marine
+                <Anchor className="w-3.5 h-3.5" /> Marine
               </button>
             </div>
-          
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">   
               {filteredProducts.length > 0 ? (    
                 filteredProducts.map((hasil) => ( 
@@ -422,7 +437,7 @@ Mohon dibantu prosesnya. Terima kasih!`);
                   </div>
                 </div>
               </div>
-              
+          
               <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col gap-4">
                 <div className="flex items-start justify-between">
                   <div className="bg-blue-50 p-3 rounded-2xl"><Package className="text-blue-500 w-6 h-6" /></div>
@@ -464,7 +479,7 @@ Mohon dibantu prosesnya. Terima kasih!`);
             </div>
           </div>
         )}
-        
+
         {activeMenu === 'input' && <UploadForm />}
         {activeMenu === 'pesanan' && <OrderTable />}
       </main>
