@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import UploadForm from '../components/dashboard/UploadForm';
 import OrderTable from '../components/dashboard/OrderTable';
-import { LayoutDashboard, PackagePlus, ClipboardList, DollarSign, Package, TrendingUp, Camera, Image, ArrowLeft, Pencil, X, List, ShoppingCart, MapPin, Trash2 } from 'lucide-react';
+import { LayoutDashboard, PackagePlus, ClipboardList, DollarSign, Package, TrendingUp, Camera, Image, ArrowLeft, Pencil, X, List, ShoppingCart, MapPin, Trash2, Leaf, Anchor } from 'lucide-react';
 
 const DashboardMitra = () => {
   const [activeMenu, setActiveMenu] = useState('Keranjang');
   const [mitra, setMitra] = useState({ nama: 'Memuat...', avatarUrl: null });
   const [products, setProducts] = useState([]);
+  const [filterCategory, setFilterCategory] = useState('Semua'); 
   const [isUploading, setIsUploading] = useState(false);
   const [showProfileViewer, setShowProfileViewer] = useState(false);
   const [isOpen, setIsOpen] = useState(true);
@@ -24,7 +25,11 @@ const DashboardMitra = () => {
   };
       const handleHapus = async (id, namaHasil) => {
     const konfirmasi = window.confirm(`Apakah Anda yakin ingin menghapus ${namaHasil}?`);
-    if (!konfirmasi) return;
+      const filteredProducts = products.filter((p) => {
+    if (filterCategory === 'Semua') return true;
+    return p.category?.toLowerCase() === filterCategory.toLowerCase();
+  });
+    if (!konfirmasi) ;return
 
     try {
       const { error } = await supabase.from('Hasil').delete().eq('id', id);
@@ -39,7 +44,7 @@ const DashboardMitra = () => {
 
     const handleEdit = async (id, hargaSaatIni, namaHasil) => {
     const hargaBaru = window.prompt(`Masukkan harga baru untuk ${namaHasil} (tanpa titik/koma):`, hargaSaatIni);
-    if (hargaBaru === null || hargaBaru === hargaSaatIni) return; 
+    if (hargaBaru === null || hargaBaru === hargaSaatIni) ; 
 
     try {
       const { error } = await supabase.from('Hasil').update({ price: hargaBaru }).eq('id', id);
@@ -59,7 +64,7 @@ const DashboardMitra = () => {
   useEffect(() => {
     const handleBuka = () => setIsOpen(true);
     window.addEventListener('buka', handleBuka);
-    return () => window.removeEventListener('buka', handleBuka);
+     () => window.removeEventListener('buka', handleBuka);
   }, []);
 
   const targetPhone = "6281361293319";
@@ -103,7 +108,7 @@ Mohon dibantu prosesnya. Terima kasih!`);
 
   const handleUploadFoto = async (event) => {
     const file = event.target.files[0];
-    if (!file) return;
+    if (!file) ;
 
     try {
       setIsUploading(true);
@@ -148,7 +153,7 @@ Mohon dibantu prosesnya. Terima kasih!`);
     setIsOpen(false);
   };
 
-  return (
+   (
     <div className="flex h-screen overflow-hidden bg-gray-50 relative">
       
       {/* =========================================
@@ -311,12 +316,32 @@ Mohon dibantu prosesnya. Terima kasih!`);
               <p className="text-gray-500 mt-1">Berikut adalah daftar produk yang Anda kelola di AgroMarina.</p>
             </div>
           
-         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">   
-              {products.length > 0 ? (    
-                products.map((hasil) => ( 
+         <div className="flex gap-3 overflow-x-auto pb-2 mt-6">
+              <button 
+                onClick={() => setFilterCategory('Semua')} 
+                className={`px-5 py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${filterCategory === 'Semua' ? 'bg-[#0F172A] text-white shadow-md' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
+              >
+                Semua Hasil
+              </button>
+              <button 
+                onClick={() => setFilterCategory('Agro')} 
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${filterCategory === 'Agro' ? 'bg-white border-2 border-[#10B981] text-[#10B981] shadow-sm' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
+              >
+                <Leaf className="w-4 h-4" /> Agro
+              </button>
+              <button 
+                onClick={() => setFilterCategory('Marine')} 
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${filterCategory === 'Marine' ? 'bg-white border-2 border-slate-700 text-slate-700 shadow-sm' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
+              >
+                <Anchor className="w-4 h-4" /> Marine
+              </button>
+            </div>
+          
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">   
+              {filteredProducts.length > 0 ? (    
+                filteredProducts.map((hasil) => ( 
                   <div key={hasil.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col hover:shadow-md transition-shadow">
                     
-                    {/* Gambar & Label Kategori */}
                     <div className="relative h-48 bg-gray-100">
                       <img 
                         src={hasil.image || "https://via.placeholder.com/400x300?text=Tidak+Ada+Foto"} 
@@ -328,7 +353,6 @@ Mohon dibantu prosesnya. Terima kasih!`);
                       </span>
                     </div>
 
-                    {/* Informasi Produk */}
                     <div className="p-5 flex-1 flex flex-col">
                       <h3 className="text-xl font-bold text-gray-900 mb-1">{hasil.name}</h3> 
                       
@@ -337,18 +361,17 @@ Mohon dibantu prosesnya. Terima kasih!`);
                         <span className="truncate">{hasil.location || 'Aceh Selatan'}</span>
                       </div>
                       
-                      {/* Harga & Ikon Aksi (Bawah) */}
                       <div className="flex justify-between items-end mt-auto pt-4 border-t border-gray-100">
                         <div>
                           <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">
                             Harga per {hasil.unit || 'Kg'}
                           </p>
                           <p className="text-xl font-extrabold text-gray-900">
-                            Rp {hasil.price}
+                            {/* KODE INI YANG MEMBUAT HARGA ADA TITIKNYA */}
+                            Rp {Number(hasil.price).toLocaleString('id-ID')}
                           </p>
                         </div>
                         
-                        {/* Tombol dengan Ikon Pensil dan Tempat Sampah */}
                         <div className="flex gap-2">
                           <button 
                             onClick={() => handleEdit(hasil.id, hasil.price, hasil.name)} 
@@ -366,13 +389,12 @@ Mohon dibantu prosesnya. Terima kasih!`);
                           </button>
                         </div>
                       </div>
-
                     </div>
                   </div>
                 ))
               ) : (
                 <div className="col-span-full py-12 text-center bg-white rounded-2xl border border-dashed border-gray-300">
-                  <p className="text-gray-500 font-medium">Belum ada hasil yang diunggah.</p>     
+                  <p className="text-gray-500 font-medium">Belum ada hasil di kategori ini.</p>     
                 </div>
               )}   
             </div>
