@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import UploadForm from '../components/dashboard/UploadForm';
 import OrderTable from '../components/dashboard/OrderTable';
-import { LayoutDashboard, PackagePlus, ClipboardList, DollarSign, Package, TrendingUp, Camera, Image, ArrowLeft, Pencil, X, List, ShoppingCart } from 'lucide-react';
+import { LayoutDashboard, PackagePlus, ClipboardList, DollarSign, Package, TrendingUp, Camera, Image, ArrowLeft, Pencil, X, List, ShoppingCart, MapPin, Trash2 } from 'lucide-react';
 
 const DashboardMitra = () => {
   const [activeMenu, setActiveMenu] = useState('Keranjang');
@@ -20,6 +20,35 @@ const DashboardMitra = () => {
         .select('*')
         .eq('mitra_id', user.id);
       setProducts(data || []);
+    }
+  };
+      const handleHapus = async (id, namaHasil) => {
+    const konfirmasi = window.confirm(`Apakah Anda yakin ingin menghapus ${namaHasil}?`);
+    if (!konfirmasi) return;
+
+    try {
+      const { error } = await supabase.from('Hasil').delete().eq('id', id);
+      if (error) throw error;
+      
+      setProducts(products.filter((p) => p.id !== id));
+      alert(`${namaHasil} berhasil dihapus!`);
+    } catch (error) {
+      alert('Gagal menghapus produk: ' + error.message);
+    }
+  };
+
+    const handleEdit = async (id, hargaSaatIni, namaHasil) => {
+    const hargaBaru = window.prompt(`Masukkan harga baru untuk ${namaHasil} (tanpa titik/koma):`, hargaSaatIni);
+    if (hargaBaru === null || hargaBaru === hargaSaatIni) return; 
+
+    try {
+      const { error } = await supabase.from('Hasil').update({ price: hargaBaru }).eq('id', id);
+      if (error) throw error;
+      
+      setProducts(products.map((p) => p.id === id ? { ...p, price: hargaBaru } : p));
+      alert(`Harga ${namaHasil} berhasil diperbarui!`);
+    } catch (error) {
+      alert('Gagal memperbarui harga: ' + error.message);
     }
   };
 
@@ -282,22 +311,69 @@ Mohon dibantu prosesnya. Terima kasih!`);
               <p className="text-gray-500 mt-1">Berikut adalah daftar produk yang Anda kelola di AgroMarina.</p>
             </div>
           
-            <div className="grid gap-4">   
+         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">   
               {products.length > 0 ? (    
                 products.map((hasil) => ( 
-                  <div key={hasil.id} className="bg-white p-4 rounded-xl shadow-sm border flex justify-between items-center">
-                    <div>
-                      <h3 className="font-bold">{hasil.name}</h3> 
-                      <p className="text-sm text-gray-500">Rp {hasil.price}</p>   
+                  <div key={hasil.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col hover:shadow-md transition-shadow">
+                    
+                    {/* Gambar & Label Kategori */}
+                    <div className="relative h-48 bg-gray-100">
+                      <img 
+                        src={hasil.image || "https://via.placeholder.com/400x300?text=Tidak+Ada+Foto"} 
+                        alt={hasil.name} 
+                        className="w-full h-full object-cover" 
+                      />
+                      <span className={`absolute top-3 left-3 text-white text-[10px] font-black px-3 py-1.5 rounded-lg uppercase tracking-wider shadow-sm ${hasil.category?.toLowerCase() === 'marine' ? 'bg-blue-500' : 'bg-[#10B981]'}`}>
+                        {hasil.category || 'Agro'}
+                      </span>
                     </div>
-                    <div className="flex gap-2">
-                      <button className="text-emerald-600 font-bold px-4 py-2 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition">Edit</button>
-                      <button className="text-red-500 font-bold px-4 py-2 bg-red-50 rounded-lg hover:bg-red-100 transition">Hapus</button>
+
+                    {/* Informasi Produk */}
+                    <div className="p-5 flex-1 flex flex-col">
+                      <h3 className="text-xl font-bold text-gray-900 mb-1">{hasil.name}</h3> 
+                      
+                      <div className="flex items-center gap-1.5 text-sm text-gray-500 mb-4">
+                        <MapPin className="w-4 h-4 shrink-0" />
+                        <span className="truncate">{hasil.location || 'Aceh Selatan'}</span>
+                      </div>
+                      
+                      {/* Harga & Ikon Aksi (Bawah) */}
+                      <div className="flex justify-between items-end mt-auto pt-4 border-t border-gray-100">
+                        <div>
+                          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">
+                            Harga per {hasil.unit || 'Kg'}
+                          </p>
+                          <p className="text-xl font-extrabold text-gray-900">
+                            Rp {hasil.price}
+                          </p>
+                        </div>
+                        
+                        {/* Tombol dengan Ikon Pensil dan Tempat Sampah */}
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => handleEdit(hasil.id, hasil.price, hasil.name)} 
+                            className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition shadow-sm"
+                            title="Edit Harga"
+                          >
+                            <Pencil className="w-5 h-5" />
+                          </button>
+                          <button 
+                            onClick={() => handleHapus(hasil.id, hasil.name)} 
+                            className="p-2.5 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition shadow-sm"
+                            title="Hapus Produk"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </div>
+
                     </div>
                   </div>
                 ))
               ) : (
-                <p className="text-gray-500">Belum ada hasil yang diunggah.</p>     
+                <div className="col-span-full py-12 text-center bg-white rounded-2xl border border-dashed border-gray-300">
+                  <p className="text-gray-500 font-medium">Belum ada hasil yang diunggah.</p>     
+                </div>
               )}   
             </div>
           </div>
