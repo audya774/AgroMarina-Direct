@@ -5,6 +5,9 @@ import OrderTable from '../components/dashboard/OrderTable';
 import { LayoutDashboard, PackagePlus, ClipboardList, DollarSign, Package, TrendingUp, Camera, Image, ArrowLeft, Pencil, X, List, ShoppingCart, MapPin, Trash2, Leaf, Anchor } from 'lucide-react';
 
 const DashboardMitra = () => {
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editFormData, setEditFormData] = useState({ id: '', name: '', oldName: '', price: '', location: '', image: '', unit: 'Kg' });
+  const [showImagePreviewer, setShowImagePreviewer] = useState(false);
   const [activeMenu, setActiveMenu] = useState('Keranjang');
   const [mitra, setMitra] = useState({ nama: 'Memuat...', avatarUrl: null });
   const [products, setProducts] = useState([]);
@@ -36,19 +39,58 @@ const DashboardMitra = () => {
       alert('Gagal menghapus produk: ' + error.message);
     }
   };
+     const handleEdit = (id, price, name, location, image, unit) => {
+     setEditFormData({ id, price, name, oldName: name, location, image, unit: unit || 'Kg' });
+     setShowEditModal(true);
+  };
 
-    const handleEdit = async (id, hargaSaatIni, namaHasil) => {
-    const hargaBaru = window.prompt(`Masukkan harga baru untuk ${namaHasil} (tanpa titik/koma):`, hargaSaatIni);
-      if (hargaBaru === null || hargaBaru === hargaSaatIni) return; 
-
-    try {
-      const { error } = await supabase.from('Hasil').update({ price: hargaBaru }).eq('name', id);
-      if (error) throw error;
+  const handleSaveEdit = async (e) => {
+  e.preventDefault();
+  try {
+    const { error } = await supabase
+      .from('Hasil')
+      .update({ 
+        name: editFormData.name,
+        location: editFormData.location,
+        price: editFormData.price,
+        unit: editFormData.unit // Memastikan kolom unit ikut diperbarui
+      })
+      .eq('name', editFormData.oldName);
       
-      setProducts(products.map((p) => p.id === id ? { ...p, price: hargaBaru } : p));
-      alert(`Harga ${namaHasil} berhasil diperbarui!`);
+    if (error) throw error;
+    
+    alert('Perubahan berhasil disimpan!');
+    setShowEditModal(false);
+    fetchMyProducts(); // Memuat ulang data produk agar sinkron
+  } catch (error) {
+    alert('Gagal menyimpan perubahan: ' + error.message);
+  }
+};
+
+  const handleModalImageChange = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('hasil-images')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('hasil-images')
+        .getPublicUrl(fileName);
+
+      await supabase.from('Hasil').update({ image: publicUrl }).eq('name', editFormData.oldName);
+
+      setEditFormData({ ...editFormData, image: publicUrl });
+      alert('Gambar produk berhasil diperbarui!');
     } catch (error) {
-      alert('Gagal memperbarui harga: ' + error.message);
+      alert('Gagal mengunggah gambar: ' + error.message);
     }
   };
 
@@ -309,7 +351,7 @@ Mohon dibantu prosesnya. Terima kasih!`);
           </div>
         </div>
 
-        {/* KONTEN KERANJANG */}
+                {/* KONTEN KERANJANG */}
         {activeMenu === 'Keranjang' && (
           <div className="space-y-6">
             <div>
@@ -357,6 +399,7 @@ Mohon dibantu prosesnya. Terima kasih!`);
                 filteredProducts.map((hasil) => ( 
                   <div key={hasil.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col hover:shadow-md transition-shadow">
                     
+                    {/* BAGIAN GAMBAR DENGAN INPUT FILE TERSEMBUNYI */}
                     <div className="relative h-48 bg-gray-100">
                       <img 
                         src={hasil.image || "https://via.placeholder.com/400x300?text=Tidak+Ada+Foto"} 
@@ -366,6 +409,23 @@ Mohon dibantu prosesnya. Terima kasih!`);
                       <span className={`absolute top-3 left-3 text-white text-[10px] font-black px-3 py-1.5 rounded-lg uppercase tracking-wider shadow-sm ${hasil.category?.toLowerCase() === 'marine' ? 'bg-blue-500' : 'bg-[#10B981]'}`}>
                         {hasil.category || 'Agro'}
                       </span>
+
+                      {/* Input File Tersembunyi Khusus Tiap Produk (Dipicu dari Tombol Edit) */}
+                      <input 
+                        type="file" 
+                        id={`cam-${hasil.id}`} 
+                        accept="image/*" 
+                        capture="user" 
+                        className="hidden" 
+                        onChange={(e) => handleUpdateGambar(hasil.name, e)} 
+                      />
+                      <input 
+                        type="file" 
+                        id={`gal-${hasil.id}`} 
+                        accept="image/*" 
+                        className="hidden" 
+                        onChange={(e) => handleUpdateGambar(hasil.name, e)} 
+                      />
                     </div>
 
                     <div className="p-5 flex-1 flex flex-col">
@@ -382,19 +442,19 @@ Mohon dibantu prosesnya. Terima kasih!`);
                             Harga per {hasil.unit || 'Kg'}
                           </p>
                           <p className="text-xl font-extrabold text-gray-900">
-                            {/* KODE INI YANG MEMBUAT HARGA ADA TITIKNYA */}
                             Rp {Number(hasil.price).toLocaleString('id-ID')}
                           </p>
                         </div>
                         
                         <div className="flex gap-2">
+                       {/* TOMBOL EDIT DENGAN PARAMETER LENGKAP */}
                           <button 
-                            onClick={() => handleEdit(hasil.id, hasil.price, hasil.name)} 
-                            className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition shadow-sm"
-                            title="Edit Harga"
-                          >
-                            <Pencil className="w-5 h-5" />
-                          </button>
+                          onClick={() => handleEdit(hasil.id, hasil.price, hasil.name, hasil.location, hasil.image, hasil.unit)} 
+                       className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition shadow-sm"
+                       title="Edit Produk"
+                         >
+                        <Pencil className="w-5 h-5" />
+                        </button>
                           <button 
                             onClick={() => handleHapus(hasil.id, hasil.name)} 
                             className="p-2.5 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition shadow-sm"
@@ -483,6 +543,167 @@ Mohon dibantu prosesnya. Terima kasih!`);
         {activeMenu === 'input' && <UploadForm />}
         {activeMenu === 'pesanan' && <OrderTable />}
       </main>
+{/* MODAL EDIT PRODUK MODERN (RESPONSIF: GAYA TIKTOK DI MOBILE, PROPORSIAL DI DESKTOP) */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm">
+          {/* Lebar dinaikkan secara otomatis dari max-w-md menjadi md:max-w-2xl saat dibuka di Desktop */}
+          <div className="bg-white w-full max-w-md md:max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            
+            {/* Header Modal */}
+            <div className="flex items-center justify-between p-5 border-b border-gray-100">
+              <button onClick={() => setShowEditModal(false)} className="p-2 hover:bg-gray-100 rounded-full transition text-gray-500">
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <h2 className="text-lg font-bold text-gray-900">Edit produk</h2>
+              <button onClick={handleSaveEdit} className="text-sm font-bold text-emerald-600 hover:text-emerald-700 px-3 py-1">
+                Simpan
+              </button>
+            </div>
+
+            {/* Isi Form / Konten */}
+            <div className="flex-1 overflow-y-auto p-6">
+              
+              {/* Pembagian Grid Layout Menggunakan Pola Struktur Kolom yang Aman untuk Desktop (md:) */}
+              <div className="block md:table md:w-full md:table-fixed">
+                <div className="block md:table-row">
+                  
+                  {/* KOLOM KIRI (DESKTOP): Area Pengelolaan Gambar */}
+                  <div className="block md:table-cell md:w-1/3 md:align-top md:pr-6 pb-6 md:pb-0 border-b md:border-b-0 md:border-r border-gray-100">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <div 
+                        onClick={() => setShowImagePreviewer(true)} // Membuka pop-up pratinjau saat diklik
+                        className="relative w-28 h-28 md:w-36 md:h-36 bg-gray-100 rounded-2xl overflow-hidden shadow-inner border border-gray-200 cursor-pointer hover:opacity-90 transition group mx-auto"
+                        title="Klik untuk pratinjau & ubah gambar"
+                      >
+                        <img src={editFormData.image || "https://via.placeholder.com/150"} alt="Produk" className="w-full h-full object-cover" />
+                        {/* Lapisan Hitam Transparan dan Ikon Pensil di Tengah Tetap Dipertahankan */}
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-80 group-hover:bg-black/50 transition-colors">
+                          <Pencil className="w-6 h-6 text-white md:w-8 md:h-8" />
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-gray-400 font-medium text-center mt-1">Ketuk gambar untuk memperbarui</p>
+
+                      {/* Input File Hidden */}
+                      <input type="file" id="modal-cam" accept="image/*" capture="user" className="hidden" onChange={handleModalImageChange} />
+                      <input type="file" id="modal-gal" accept="image/*" className="hidden" onChange={handleModalImageChange} />
+                    </div>
+                  </div>
+
+                  {/* KOLOM KANAN (DESKTOP): Area Penginputan Isian Data Teks */}
+                  <div className="block md:table-cell md:w-2/3 md:align-top md:pl-6 pt-6 md:pt-0">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between py-3 border-b border-gray-100">
+                        <span className="text-sm font-semibold text-gray-500">Nama</span>
+                        <input 
+                          type="text" 
+                          value={editFormData.name} 
+                          onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                          className="text-sm font-bold text-right text-gray-900 bg-transparent focus:outline-none focus:text-emerald-600 w-full max-w-[200px] md:max-w-xs"
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between py-3 border-b border-gray-100">
+                        <span className="text-sm font-semibold text-gray-500">Lokasi</span>
+                        <input 
+                          type="text" 
+                          value={editFormData.location} 
+                          onChange={(e) => setEditFormData({ ...editFormData, location: e.target.value })}
+                          className="text-sm font-bold text-right text-gray-900 bg-transparent focus:outline-none focus:text-emerald-600 w-full max-w-[200px] md:max-w-xs"
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between py-3 border-b border-gray-100">
+                        <span className="text-sm font-semibold text-gray-500">Harga (Rp)</span>
+                        <input 
+                          type="number" 
+                          value={editFormData.price} 
+                          onChange={(e) => setEditFormData({ ...editFormData, price: e.target.value })}
+                          className="text-sm font-bold text-right text-gray-900 bg-transparent focus:outline-none focus:text-emerald-600 w-full max-w-[200px] md:max-w-xs"
+                        />
+                      </div>
+
+                      {/* Dropdown Pilihan Satuan */}
+                      <div className="flex items-center justify-between py-3 border-b border-gray-100">
+                        <span className="text-sm font-semibold text-gray-500">Satuan</span>
+                        <select
+                          value={editFormData.unit || 'Kg'}
+                          onChange={(e) => setEditFormData({ ...editFormData, unit: e.target.value })}
+                          className="text-sm font-bold text-right text-gray-900 bg-transparent focus:outline-none focus:text-emerald-600 cursor-pointer pr-1"
+                        >
+                          <option value="Kg">Kg</option>
+                          <option value="Liter">Liter</option>
+                          <option value="Ikat">Ikat</option>
+                          <option value="Ekor">Ekor</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
+      {/* JENDELA POP-UP PRATINJAU GAMBAR (FIXED: SEMUA ELEMEN RAPAT DI TENGAH) */}
+      {showImagePreviewer && (
+        <div className="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center p-4 backdrop-blur-md">
+          {/* Box pembungkus utama agar konten selalu di tengah */}
+          <div className="w-full max-w-sm md:max-w-md flex flex-col items-center gap-6 animate-fade-in">
+            
+            {/* Header Pratinjau */}
+            <div className="flex items-center justify-between w-full text-white">
+              <button 
+                type="button"
+                onClick={() => setShowImagePreviewer(false)} 
+                className="p-2.5 bg-white/10 hover:bg-white/20 rounded-full transition active:scale-95"
+              >
+                <X className="w-6 h-6" />
+              </button>
+              <span className="text-sm font-medium tracking-wide">Pratinjau Foto</span>
+              <div className="w-10"></div>
+            </div>
+
+            {/* Gambar Utama */}
+            <div className="w-full aspect-square bg-zinc-900 rounded-3xl overflow-hidden shadow-2xl border border-zinc-800">
+              <img 
+                src={editFormData.image || "https://via.placeholder.com/400x400?text=Tidak+Ada+Foto"} 
+                alt="Pratinjau Produk" 
+                className="w-full h-full object-cover"
+              />
+            </div>
+
+            {/* Tombol Aksi */}
+            <div className="flex flex-col items-center gap-4 w-full">
+              <p className="text-xs font-semibold text-zinc-400 text-center">Pilih sumber untuk memperbarui gambar:</p>
+              <div className="flex gap-4 w-full">
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    document.getElementById('modal-cam').click();
+                    setShowImagePreviewer(false);
+                  }} 
+                  className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow active:scale-95 transition"
+                >
+                  <Camera className="w-4 h-4" /> Kamera
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    document.getElementById('modal-gal').click();
+                    setShowImagePreviewer(false);
+                  }} 
+                  className="flex-1 py-3 bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-sm rounded-xl flex items-center justify-center gap-2 border border-zinc-700 shadow active:scale-95 transition"
+                >
+                  <Image className="w-4 h-4" /> Galeri
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 };
