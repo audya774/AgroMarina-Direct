@@ -38,9 +38,12 @@ export default function Navbar() {
               </svg>
             )}
           </button>
-
-          <Link to="/" className="text-xl md:text-2xl font-black text-emerald-600 tracking-tight">
-            Agro<span className="text-slate-800">Marina</span>
+          <Link to="/" className="flex items-center -ml-5">
+            <img 
+              src="/icon.png" 
+              alt="Logo AgroMarina" 
+              className="h-[60px] w-auto object-contain" 
+            />
           </Link>
         </div>
 
@@ -65,6 +68,14 @@ export default function Navbar() {
             <Link to="/marketplace" onClick={() => setIsMenuOpen(false)} className="text-slate-700 hover:text-emerald-600 hover:pl-2 font-semibold transition-all">
               Pasar Digital
             </Link>
+            
+            <Link to="/jasa-agromarine" onClick={() => setIsMenuOpen(false)} className="text-slate-700 hover:text-emerald-600 hover:pl-2 font-semibold transition-all">
+              Jasa Agromarine
+             </Link>
+            
+             <Link to="/pusat-sewa" onClick={() => setIsMenuOpen(false)} className="text-slate-700 hover:text-emerald-600 hover:pl-2 font-semibold transition-all">
+              Pusat Sewa
+              </Link>           
             
             {/* Tombol MitraPanel yang sudah diedit */}
             <button 

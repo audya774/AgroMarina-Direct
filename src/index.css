@@ -3,15 +3,27 @@
 @tailwind utilities;
 
 /* -------------------------------------------------------------------------- */
-/* KUSTOMISASI ANIMASI (Untuk Sidebar Keranjang Belanja)                      */
+/* KUNCI ROOT (Mencegah Swipe Kanan & Ruang Kosong)                          */
+/* -------------------------------------------------------------------------- */
+html, body {
+  overflow-x: hidden; /* Mencegah swipe ke kanan */
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* -------------------------------------------------------------------------- */
+/* KUSTOMISASI ANIMASI                                                        */
 /* -------------------------------------------------------------------------- */
 @keyframes slideIn {
-  from {
-    transform: translateX(100%);
-  }
-  to {
-    transform: translateX(0);
-  }
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
 }
 
 .animate-slide-in {
@@ -19,22 +31,19 @@
 }
 
 /* -------------------------------------------------------------------------- */
-/* KUSTOMISASI SCROLLBAR (Agar Market Ticker & Halaman Lebih Clean)          */
+/* KUSTOMISASI SCROLLBAR (Dibatasi pada elemen tertentu)                     */
 /* -------------------------------------------------------------------------- */
-/* Mengubah ukuran scrollbar horizontal pada market ticker */
-::-webkit-scrollbar {
+/* Jangan gunakan global agar tidak merusak layout footer */
+.custom-scrollbar::-webkit-scrollbar {
   height: 4px;
   width: 6px;
 }
 
-/* Warna jalur scrollbar */
-::-webkit-scrollbar-track {
+.custom-scrollbar::-webkit-scrollbar-track {
   background: #f1f5f9;
 }
 
-/* Warna batang penunjuk scrollbar */
-::-webkit-scrollbar-thumb {
+.custom-scrollbar::-webkit-scrollbar-thumb {
   background: #cbd5e1;
-  border-radius: 10px; /* Tambahan sedikit agar scrollbar lebih membulat dan rapi */
+  border-radius: 10px;
 }
-

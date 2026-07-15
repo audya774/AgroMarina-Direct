@@ -1,152 +1,288 @@
-import React, { useState } from 'react';
-import { 
-  MapPin, 
-  Clock, 
-  ShieldCheck, 
-  ChevronRight, 
-  Anchor, 
-  Leaf, 
-  ShoppingCart,
-  Minus,
-  Plus
-} from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { X } from 'lucide-react';
+import { supabase } from '../services/supabase';
 
 export default function ProductDetail() {
-  // Mock Data: Nantinya ini didapatkan dari URL parameter atau Firebase (api.js)
-  const product = {
-    id: 1,
-    name: "Ikan Tongkol Segar Tangkapan Pagi",
-    category: "Marine",
-    price: 35000,
-    unit: "kg",
-    stock: 25,
-    origin: "Perairan Pesisir Aceh Selatan",
-    farmerName: "Kelompok Nelayan Harapan Laut",
-    harvestTime: "Hari ini, 05:30 WIB",
-    description: "Ikan tongkol segar hasil tangkapan nelayan lokal langsung dari perairan Aceh Selatan. Tanpa pengawet, ditangkap menggunakan metode ramah lingkungan (pancing ulur), dan langsung masuk kotak pendingin (cold storage) di atas kapal.",
-    image: "https://images.unsplash.com/photo-1534604973900-c43ab4c2e0ab?w=800&auto=format&fit=crop&q=80"
+  const { id } = useParams(); 
+  const navigate = useNavigate();
+  
+  const [product, setProduct] = useState(null);
+  const [reviews, setReviews] = useState([]); 
+  const [loading, setLoading] = useState(true);
+
+  // State untuk Formulir Input Ulasan Baru
+  const [orderIdInput, setOrderIdInput] = useState('');
+  const [buyerNameInput, setBuyerNameInput] = useState('');
+  const [ratingInput, setRatingInput] = useState(5);
+  const [commentInput, setCommentInput] = useState('');
+
+  // 1. Mengambil data produk spesifik berdasarkan kolom 'name' (Teks) dari URL
+  useEffect(() => {
+    const fetchProductData = async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('Lapak')
+          .select('*')
+          .eq('name', id)
+          .single();
+
+        if (error) throw error;
+        setProduct(data);
+        
+        // Ambil ulasan jika data produk berhasil didapatkan
+        if (data) fetchReviews(data.name);
+      } catch (error) {
+        console.error("Gagal memuat detail produk:", error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) fetchProductData();
+  }, [id]);
+
+  // 2. Fungsi mengambil ulasan berdasarkan nama produk dari tabel 'Ulasan'
+  const fetchReviews = async (productName) => {
+    try {
+      const { data, error } = await supabase
+        .from('Ulasan')
+        .select('*')
+        .eq('product_name', productName)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setReviews(data || []);
+    } catch (error) {
+      console.error('Gagal memuat ulasan:', error.message);
+    }
   };
 
-  const [qty, setQty] = useState(1);
+  // 3. Fungsi mengirim ulasan baru dengan validasi ID Pesanan terverifikasi
+  const handleSendReview = async (e) => {
+    e.preventDefault();
+    if (!orderIdInput || !commentInput || !buyerNameInput) {
+      alert('Silakan isi semua kolom ulasan!');
+      return;
+    }
 
-  const handleDecrease = () => {
-    if (qty > 1) setQty(qty - 1);
+    try {
+      const { data: orderData, error: orderError } = await supabase
+        .from('Pesanan')
+        .select('*')
+        .eq('id', orderIdInput)
+        .eq('product_name', product.name)
+        .single();
+
+      if (orderError || !orderData) {
+        alert('ID Pesanan tidak cocok atau tidak terdaftar untuk produk ini! Ulasan ditolak.');
+        return;
+      }
+
+      const { error: reviewError } = await supabase
+        .from('Ulasan')
+        .insert([{
+          product_name: product.name,
+          buyer_name: buyerNameInput,
+          order_id: orderIdInput,
+          rating: parseInt(ratingInput),
+          comment: commentInput,
+          created_at: new Date()
+        }]);
+
+      if (reviewError) throw reviewError;
+
+      alert('Ulasan Anda berhasil diterbitkan!');
+      fetchReviews(product.name); 
+      setOrderIdInput('');
+      setCommentInput('');
+      setBuyerNameInput('');
+    } catch (error) {
+      alert('Gagal mengirim ulasan: ' + error.message);
+    }
   };
 
-  const handleIncrease = () => {
-    if (qty < product.stock) setQty(qty + 1);
-  };
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center text-slate-500 font-medium">Memuat detail produk dari database...</div>;
+  }
+
+  if (!product) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center text-slate-600 gap-4">
+        <p className="font-bold text-lg">Produk tidak ditemukan atau telah dihapus.</p>
+        <button onClick={() => navigate('/marketplace')} className="px-4 py-2 bg-slate-800 text-white rounded-xl text-sm font-bold">
+          Kembali ke Pasar
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-slate-50 py-8 px-4 md:px-8 lg:px-16">
+    // 🌟 PEMBUNGKUS UTAMA: Menggunakan py-10 agar memberi jarak aman ke navbar & footer
+    <div className="min-h-screen bg-slate-50 font-sans py-10 px-4">
       
-      {/* Breadcrumbs Navigation */}
-      <nav className="flex items-center text-sm text-slate-500 mb-8 space-x-2">
-        <span className="hover:text-emerald-600 cursor-pointer">Home</span>
-        <ChevronRight className="w-4 h-4" />
-        <span className="hover:text-emerald-600 cursor-pointer">Marketplace</span>
-        <ChevronRight className="w-4 h-4" />
-        <span className="text-slate-900 font-semibold">{product.name}</span>
-      </nav>
+      {/* CARD DETAIL UTAMA: Lebar max-w-2xl, otomatis di tengah (mx-auto), border melengkung rapi */}
+      <div className="max-w-2xl mx-auto bg-white rounded-3xl shadow-sm border border-gray-200/80 overflow-hidden">
+        
+        {/* Header Bar internal di dalam kartu */}
+        <div className="flex items-center justify-between p-5 border-b border-gray-100 bg-white">
+         <h2 className="text-lg font-black text-gray-900">
+         {product?.tipe === 'jasa' ? 'Detail Jasa' : product?.tipe === 'sewa' ? 'Detail Sewa' : 'Detail Produk'}
+          </h2>
+          <button 
+            type="button" 
+            onClick={() => navigate('/marketplace')} 
+            className="p-2 hover:bg-gray-100 rounded-full transition text-gray-500"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
 
-      {/* Main Content Grid */}
-      <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
+        {/* Konten Di Dalam Kartu (Mengalir Bebas Kebawah Tanpa Dipaksa h-screen) */}
+        <div className="p-6 space-y-6">
           
-          {/* Left Column: Image Area */}
-          <div className="relative h-[400px] md:h-full min-h-[500px] bg-slate-100">
-            <img 
-              src={product.image} 
-              alt={product.name} 
-              className="absolute inset-0 w-full h-full object-cover"
-            />
-            {/* Category Badge */}
-            <div className={`absolute top-6 left-6 px-4 py-1.5 rounded-full text-sm font-bold text-white shadow-lg flex items-center space-x-2 
-              ${product.category === 'Agro' ? 'bg-emerald-600' : 'bg-blue-600'}`}>
-              {product.category === 'Agro' ? <Leaf className="w-4 h-4" /> : <Anchor className="w-4 h-4" />}
-              <span>{product.category}</span>
-            </div>
+          {/* Gambar Besar Produk */}
+          <div className="w-full aspect-[16/10] bg-gray-100 rounded-2xl overflow-hidden border border-gray-200">
+            <img src={product.image || "https://via.placeholder.com/600x400"} alt={product.name} className="w-full h-full object-cover" />
           </div>
 
-          {/* Right Column: Product Details */}
-          <div className="p-8 lg:p-12 flex flex-col justify-center">
-            
-            <h1 className="text-3xl lg:text-4xl font-black text-slate-900 tracking-tight mb-4">
-              {product.name}
-            </h1>
-            
-            <div className="flex items-end space-x-2 mb-6">
-              <span className="text-4xl font-black text-slate-900">
-                Rp {product.price.toLocaleString('id-ID')}
-              </span>
-              <span className="text-lg text-slate-500 font-medium mb-1">/{product.unit}</span>
-            </div>
-
-            {/* SEKSI TRACEABILITY (Nilai Jual Utama) */}
-            <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 mb-8 space-y-4">
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center space-x-1">
-                <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                <span>Sertifikasi Traceability Lokal</span>
-              </h3>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex items-start space-x-3">
-                  <div className="bg-blue-100 p-2 rounded-lg text-blue-600 mt-0.5">
-                    <MapPin className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-slate-500 font-bold uppercase">Lokasi Asal</p>
-                    <p className="text-sm font-semibold text-slate-800">{product.origin}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">{product.farmerName}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start space-x-3">
-                  <div className="bg-amber-100 p-2 rounded-lg text-amber-600 mt-0.5">
-                    <Clock className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-slate-500 font-bold uppercase">Waktu Panen/Tangkap</p>
-                    <p className="text-sm font-semibold text-slate-800">{product.harvestTime}</p>
-                    <p className="text-xs text-emerald-600 font-medium mt-0.5">Kualitas Segar Terjamin</p>
-                  </div>
-                </div>
+          {/* Detail Info Harga & Lokasi */}
+          <div className="space-y-2">
+            <div className="flex justify-between items-start gap-4">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">{product.name}</h3>
+                <p className="text-xs text-slate-500 mt-1">{product.location || 'Aceh Selatan'}</p>
               </div>
+              <span className="text-lg font-black text-emerald-600 whitespace-nowrap">
+                Rp {Number(product.price).toLocaleString('id-ID')}/{product.unit || 'Kg'}
+              </span>
             </div>
-
-            <div className="mb-8">
-              <h3 className="text-sm font-bold text-slate-900 mb-2">Deskripsi Produk</h3>
-              <p className="text-slate-600 text-sm leading-relaxed">
-                {product.description}
+            
+            {/* Deskripsi dari Mitra */}
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 mt-2">
+              <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Deskripsi Mitra</h4>
+              <p className="text-sm text-gray-700 leading-relaxed">
+                {product.description || 'Mitra belum menambahkan deskripsi khusus untuk produk hasil panen ini.'}
               </p>
             </div>
+          </div>
 
-            {/* Action Area (Add to Cart) */}
-            <div className="flex items-center space-x-4 mt-auto">
-              {/* Quantity Selector */}
-              <div className="flex items-center bg-slate-100 rounded-xl border border-slate-200">
-                <button onClick={handleDecrease} className="p-3 text-slate-500 hover:text-slate-900 transition-colors">
-                  <Minus className="w-5 h-5" />
-                </button>
-                <span className="w-12 text-center font-bold text-slate-900">{qty}</span>
-                <button onClick={handleIncrease} className="p-3 text-slate-500 hover:text-slate-900 transition-colors">
-                  <Plus className="w-5 h-5" />
-                </button>
+          <hr className="border-gray-100" />
+
+          {/* FORMULIR TULIS ULASAN BARU */}
+          <div className="bg-emerald-50/50 border border-emerald-100 rounded-2xl p-5 space-y-4">
+            <h4 className="text-sm font-bold text-emerald-900 flex items-center gap-1.5">
+              <span className="p-1 bg-emerald-600 text-white rounded-md text-xs flex items-center justify-center w-5 h-5">✓</span> 
+              {/* 🟢 JUDUL ULASAN DINAMIS */}
+              {product?.tipe === 'sewa' 
+                ? 'Tulis Ulasan Penyewa' 
+                : product?.tipe === 'jasa' 
+                  ? 'Tulis Ulasan Pelanggan' 
+                  : 'Tulis Ulasan Pembeli'}
+            </h4>
+            <form onSubmit={handleSendReview} className="space-y-3.5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-500 mb-1">ID Pesanan Anda *</label>
+                  <input 
+                    type="text"
+                    placeholder="Contoh: ORDER-12345"
+                    value={orderIdInput}
+                    onChange={(e) => setOrderIdInput(e.target.value)}
+                    className="w-full px-3 py-2.5 text-xs font-semibold bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-emerald-500 shadow-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-500 mb-1">Nama Anda *</label>
+                  <input 
+                    type="text"
+                    /* 🟢 PLACEHOLDER NAMA DINAMIS */
+                    placeholder={
+                      product?.tipe === 'sewa' 
+                        ? 'Nama Penyewa' 
+                        : product?.tipe === 'jasa' 
+                          ? 'Nama Pelanggan' 
+                          : 'Nama Pembeli'
+                    }
+                    value={buyerNameInput}
+                    onChange={(e) => setBuyerNameInput(e.target.value)}
+                    className="w-full px-3 py-2 text-xs font-semibold bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-emerald-500 shadow-sm"
+                  />
+                </div>
               </div>
 
-              {/* Add to Cart Button */}
-              <button className={`flex-1 flex items-center justify-center space-x-2 text-white font-bold py-4 rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5
-                ${product.category === 'Agro' ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/30' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/30'}`}>
-                <ShoppingCart className="w-5 h-5" />
-                <span>Tambah ke Keranjang</span>
+              <div className="flex items-center gap-4">
+                <span className="text-[11px] font-bold text-gray-500">Berikan Rating:</span>
+                <select 
+                  value={ratingInput}
+                  onChange={(e) => setRatingInput(e.target.value)}
+                  className="px-2.5 py-1 text-xs font-bold bg-white border border-gray-200 rounded-lg text-amber-500 cursor-pointer focus:outline-none"
+                >
+                  <option value="5">⭐⭐⭐⭐⭐ (5)</option>
+                  <option value="4">⭐⭐⭐⭐ (4)</option>
+                  <option value="3">⭐⭐⭐ (3)</option>
+                  <option value="2">⭐⭐ (2)</option>
+                  <option value="1">⭐ (1)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-gray-500 mb-1">Ulasan Isi Komentar *</label>
+                <textarea 
+                  rows="2"
+                  placeholder="Bagaimana kualitas produk dan kesegaran hasil panen yang Anda terima?"
+                  value={commentInput}
+                  onChange={(e) => setCommentInput(e.target.value)}
+                  className="w-full p-3 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-emerald-500 shadow-sm resize-none"
+                ></textarea>
+              </div>
+
+              <button 
+                type="submit"
+                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition active:scale-95"
+              >
+                Kirim Ulasan Terverifikasi
               </button>
-            </div>
-
-            <p className="text-center text-xs text-slate-400 mt-4">
-              Sisa stok tersedia: <span className="font-bold text-slate-600">{product.stock} {product.unit}</span>
-            </p>
-
+            </form>
           </div>
+
+          {/* DAFTAR ULASAN */}
+          <div className="space-y-3">
+            <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+              Ulasan & Rating ({reviews.length})
+            </h4>
+            
+            {reviews.length === 0 ? (
+              <p className="text-xs text-gray-400 italic bg-gray-50 py-6 text-center rounded-xl border border-gray-100">
+                Belum ada ulasan terverifikasi untuk produk ini.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {reviews.map((rev) => (
+                  <div key={rev.id} className="p-4 bg-white border border-gray-100 rounded-2xl shadow-sm space-y-1">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+                        {rev.buyer_name}
+                        <span className="text-[9px] bg-emerald-100 text-emerald-700 font-extrabold px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
+                          ✓ Terverifikasi
+                        </span>
+                      </span>
+                      <span className="text-[10px] text-gray-400">
+                        {new Date(rev.created_at).toLocaleDateString('id-ID')}
+                      </span>
+                    </div>
+                    <div className="text-amber-400 text-xs font-bold">
+                      {'⭐'.repeat(rev.rating)}
+                    </div>
+                    <p className="text-xs text-gray-600 leading-relaxed pt-1">
+                      {rev.comment}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
         </div>
       </div>
     </div>

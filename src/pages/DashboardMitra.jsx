@@ -3,7 +3,16 @@ import { supabase } from '../services/supabase';
 import UploadForm from '../components/dashboard/UploadForm';
 import OrderTable from '../components/dashboard/OrderTable';
 import { LayoutDashboard, PackagePlus, ClipboardList, DollarSign, Package, TrendingUp, Camera, Image, ArrowLeft, Pencil, X, List, ShoppingCart, MapPin, Trash2, Leaf, Anchor } from 'lucide-react';
-
+const unitMapping = {
+  'Bumi Agro': ['Kg', 'Liter', 'Ikat', 'Butir'],
+  'Saprotan': ['Liter', 'Kg', 'Botol', 'Pcs'],
+  'Marine Harvest': ['Kg', 'Ekor', 'Box'],
+  'Sapronel': ['Meter', 'Pcs', 'Set'],
+  'Agro Jasa': ['Hari', 'Layanan', 'Jam'],
+  'Marine Jasa': ['Hari', 'Layanan', 'Jam'],
+  'Agro Sewa': ['Hari', 'Jam', 'Musim'],
+  'Marine Sewa': ['Hari', 'Jam', 'Musim'],
+};
 const DashboardMitra = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editFormData, setEditFormData] = useState({ id: '', name: '', oldName: '', price: '', location: '', image: '', unit: 'Kg' });
@@ -11,7 +20,8 @@ const DashboardMitra = () => {
   const [activeMenu, setActiveMenu] = useState('Keranjang');
   const [mitra, setMitra] = useState({ nama: 'Memuat...', avatarUrl: null });
   const [products, setProducts] = useState([]);
-  const [filterCategory, setFilterCategory] = useState('Semua'); 
+  const [activeSector, setActiveSector] = useState('semua');
+  const [activeSub, setActiveSub] = useState('Bumi Agro');
   const [isUploading, setIsUploading] = useState(false);
   const [showProfileViewer, setShowProfileViewer] = useState(false);
   const [isOpen, setIsOpen] = useState(true);
@@ -20,52 +30,67 @@ const DashboardMitra = () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       const { data } = await supabase
-        .from('Hasil') 
+        .from('Lapak') 
         .select('*')
         .eq('mitra_id', user.id);
       setProducts(data || []);
     }
   };
-    const handleHapus = async (id, namaHasil) => {
+  const handleHapus = async (id, namaHasil) => {
     const konfirmasi = window.confirm(`Apakah Anda yakin ingin menghapus ${namaHasil}?`);
     if (!konfirmasi) return;
     try {
-      const { error } = await supabase.from('Hasil').delete().eq('name', id);
+      const { error } = await supabase.from('Lapak').delete().eq('name', namaHasil);
       if (error) throw error;
-      
-      setProducts(products.filter((p) => p.id !== id));
+    
+      setProducts(products.filter((p) => p.name !== namaHasil));
       alert(`${namaHasil} berhasil dihapus!`);
     } catch (error) {
       alert('Gagal menghapus produk: ' + error.message);
     }
   };
-     const handleEdit = (id, price, name, location, image, unit) => {
-     setEditFormData({ id, price, name, oldName: name, location, image, unit: unit || 'Kg' });
-     setShowEditModal(true);
+  
+  const handleEdit = (id, price, name, location, image, unit, category, tipe, description, stock) => {
+    setEditFormData({ 
+      id, 
+      price, 
+      name, 
+      oldName: name, 
+      location, 
+      image, 
+      unit: unit || 'Kg',
+      category: category || '', 
+      tipe: tipe || '', 
+      description: description || '', 
+      stock: stock || 0 
+    });
+    setShowEditModal(true);
   };
-
+  
   const handleSaveEdit = async (e) => {
   e.preventDefault();
   try {
     const { error } = await supabase
-      .from('Hasil')
+      .from('Lapak')
       .update({ 
         name: editFormData.name,
         location: editFormData.location,
         price: editFormData.price,
-        unit: editFormData.unit // Memastikan kolom unit ikut diperbarui
+        unit: editFormData.unit,
+        description: editFormData.description, // Tambahkan ini
+        stock: editFormData.stock              // Tambahkan ini
       })
       .eq('name', editFormData.oldName);
       
     if (error) throw error;
-    
     alert('Perubahan berhasil disimpan!');
     setShowEditModal(false);
-    fetchMyProducts(); // Memuat ulang data produk agar sinkron
+    fetchMyProducts();
   } catch (error) {
-    alert('Gagal menyimpan perubahan: ' + error.message);
+    alert('Gagal: ' + error.message);
   }
 };
+
 
   const handleModalImageChange = async (event) => {
     const file = event.target.files[0];
@@ -76,16 +101,16 @@ const DashboardMitra = () => {
       const fileName = `${Math.random()}.${fileExt}`;
       
       const { error: uploadError } = await supabase.storage
-        .from('hasil-images')
+        .from('Lapak-images')
         .upload(fileName, file);
 
       if (uploadError) throw uploadError;
 
       const { data: { publicUrl } } = supabase.storage
-        .from('hasil-images')
+        .from('Lapak-images')
         .getPublicUrl(fileName);
 
-      await supabase.from('Hasil').update({ image: publicUrl }).eq('name', editFormData.oldName);
+      await supabase.from('Lapak').update({ image: publicUrl }).eq('name', editFormData.oldName);
 
       setEditFormData({ ...editFormData, image: publicUrl });
       alert('Gambar produk berhasil diperbarui!');
@@ -111,7 +136,7 @@ const DashboardMitra = () => {
 Saya ingin meminta bantuan untuk melakukan *Upload Hasil* baru ke marketplace. Berikut detail hasil panen/tangkapan saya:
 
 - Nama Hasil : 
-- Kategori (Agro / Marine) : 
+- Kategori (Bumi Agro / Marine Harvest / Saprotan / Sapronel) : 
 - Foto Hasil : (Silakan kirimkan fotonya di chat ini)
 - Lokasi Panen/Tangkapan : 
 - Harga Hasil (per kg/liter/ikat) : 
@@ -123,7 +148,7 @@ Mohon dibantu prosesnya. Terima kasih!`);
 Saya ingin meminta bantuan untuk melakukan *Perubahan Harga* pada hasil panen/tangkapan saya. Berikut detail perubahannya:
 
 - Nama Hasil : 
-- Kategori (Agro / Marine) : 
+- Kategori (Bumi Agro / Marine Harvest / Saprotan / Sapronel) : 
 - Lokasi Panen/Tangkapan : 
 - Harga Sebelumnya : 
 - Harga Sekarang : 
@@ -190,9 +215,11 @@ Mohon dibantu prosesnya. Terima kasih!`);
     setIsOpen(false);
   };
 
-  const filteredProducts = products.filter((p) => {
-    if (filterCategory === 'Semua') return true;
-    return p.category?.toLowerCase() === filterCategory.toLowerCase();
+    const filteredProducts = products.filter(product => {
+    if (activeSector === 'semua') return true;
+    if (activeSector === 'agro') return product.category === activeSub;
+    if (activeSector === 'marine') return product.category === activeSub;
+    return false;
   });
 
   return (
@@ -291,13 +318,13 @@ Mohon dibantu prosesnya. Terima kasih!`);
         
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
           <button onClick={() => handleMenuClick('Keranjang')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${activeMenu === 'Keranjang' ? 'bg-[#10B981]' : 'hover:bg-gray-800'}`}>
-            <ShoppingCart className="w-5 h-5" /> <span>Keranjang Hasil Saya</span>
+            <ShoppingCart className="w-5 h-5" /> <span>Lapak saya</span>
           </button>
           <button onClick={() => handleMenuClick('ringkasan')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${activeMenu === 'ringkasan' ? 'bg-[#10B981]' : 'hover:bg-gray-800'}`}>
             <LayoutDashboard className="w-5 h-5" /> Ringkasan Bisnis
           </button>
           <button onClick={() => handleMenuClick('input')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${activeMenu === 'input' ? 'bg-[#10B981]' : 'hover:bg-gray-800'}`}>
-            <PackagePlus className="w-5 h-5" /> Input Hasil Baru
+            <PackagePlus className="w-5 h-5" /> Input Lapak 
           </button>
           <button onClick={() => handleMenuClick('pesanan')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${activeMenu === 'pesanan' ? 'bg-[#10B981]' : 'hover:bg-gray-800'}`}>
             <ClipboardList className="w-5 h-5" /> Daftar Pesanan
@@ -359,45 +386,101 @@ Mohon dibantu prosesnya. Terima kasih!`);
               <p className="text-gray-500 mt-1">Berikut adalah daftar produk yang Anda kelola di AgroMarina.</p>
             </div>
             
-            <div className="flex justify-center items-center gap-2 w-full mt-6 px-2">
+            {/* 🌟 TIER 1: SEKTOR UTAMA */}
+            <div className="flex flex-wrap items-center gap-2 w-full mt-6">
               <button 
-                onClick={() => setFilterCategory('Semua')} 
-                className={`flex-1 max-w-[120px] text-center py-2.5 rounded-xl font-bold text-xs transition-all shadow-sm border ${
-                  filterCategory === 'Semua' 
-                    ? 'bg-[#0F172A] text-white border-[#0F172A]' 
-                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                onClick={() => setActiveSector('semua')} 
+                className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all shadow-sm border ${
+                  activeSector === 'semua' ? 'bg-[#0F172A] text-white border-[#0F172A]' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
                 }`}
               >
                 Semua
               </button>
               
               <button 
-                onClick={() => setFilterCategory('Agro')} 
-                className={`flex-1 max-w-[120px] flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-bold text-xs transition-all shadow-sm border ${
-                  filterCategory === 'Agro' 
-                    ? 'bg-[#10B981] text-white border-[#10B981]' 
-                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                onClick={() => { setActiveSector('agro'); setActiveSub('Bumi Agro'); }} 
+                className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm transition-all shadow-sm border ${
+                  activeSector === 'agro' ? 'bg-[#10B981] text-white border-[#10B981]' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
                 }`}
               >
-                <Leaf className="w-3.5 h-3.5" /> Agro
+                <Leaf className="w-4 h-4" /> Agro
               </button>
               
               <button 
-                onClick={() => setFilterCategory('Marine')} 
-                className={`flex-1 max-w-[120px] flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-bold text-xs transition-all shadow-sm border ${
-                  filterCategory === 'Marine' 
-                    ? 'bg-blue-600 text-white border-blue-600' 
-                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                onClick={() => { setActiveSector('marine'); setActiveSub('Marine Harvest'); }} 
+                className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm transition-all shadow-sm border ${
+                  activeSector === 'marine' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
                 }`}
               >
-                <Anchor className="w-3.5 h-3.5" /> Marine
+                <Anchor className="w-4 h-4" /> Marine 
               </button>
             </div>
+
+            {/* 🌟 TIER 2: SUB-KATEGORI */}
+            {activeSector !== 'semua' && (
+              <div className="flex items-center gap-3 mt-4 overflow-x-auto pb-2 scroll-smooth [scrollbar-width:none]">
+                {activeSector === 'agro' ? (
+                  <>
+                    <button 
+                      onClick={() => setActiveSub('Bumi Agro')}
+                      className={`px-4 py-2 rounded-xl text-xs font-black border transition-all whitespace-nowrap ${activeSub === 'Bumi Agro' ? 'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-sm' : 'bg-white border-slate-200 text-slate-500'}`}
+                    >
+                       🌱 Bumi Agro
+                    </button>
+                    <button 
+                      onClick={() => setActiveSub('Saprotan')}
+                      className={`px-4 py-2 rounded-xl text-xs font-black border transition-all whitespace-nowrap ${activeSub === 'Saprotan' ? 'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-sm' : 'bg-white border-slate-200 text-slate-500'}`}
+                    >
+                      📦 Saprotan
+                    </button>
+                    <button 
+                      onClick={() => setActiveSub('Agro Jasa')}
+                      className={`px-4 py-2 rounded-xl text-xs font-black border transition-all whitespace-nowrap ${activeSub === 'Agro Jasa' ? 'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-sm' : 'bg-white border-slate-200 text-slate-500'}`}
+                    >
+                      🧑🏻‍🌾 Agro Jasa
+                    </button>
+                    <button 
+                      onClick={() => setActiveSub('Agro Sewa')}
+                      className={`px-4 py-2 rounded-xl text-xs font-black border transition-all whitespace-nowrap ${activeSub === 'Agro Sewa' ? 'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-sm' : 'bg-white border-slate-200 text-slate-500'}`}
+                    >
+                     🚜 Agro Sewa
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button 
+                      onClick={() => setActiveSub('Marine Harvest')}
+                      className={`px-4 py-2 rounded-xl text-xs font-black border transition-all whitespace-nowrap ${activeSub === 'Marine Harvest' ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-sm' : 'bg-white border-slate-200 text-slate-500'}`}
+                    >
+                      🐟 Marine Harvest
+                    </button>
+                    <button 
+                      onClick={() => setActiveSub('Sapronel')}
+                      className={`px-4 py-2 rounded-xl text-xs font-black border transition-all whitespace-nowrap ${activeSub === 'Sapronel' ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-sm' : 'bg-white border-slate-200 text-slate-500'}`}
+                    >
+                      ⚓ Sapronel
+                    </button>
+                    <button 
+                      onClick={() => setActiveSub('Marine Jasa')}
+                      className={`px-4 py-2 rounded-xl text-xs font-black border transition-all whitespace-nowrap ${activeSub === 'Marine Jasa' ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-sm' : 'bg-white border-slate-200 text-slate-500'}`}
+                    >
+                     ⛵ Marine Jasa
+                    </button>
+                    <button 
+                      onClick={() => setActiveSub('Marine Sewa')}
+                      className={`px-4 py-2 rounded-xl text-xs font-black border transition-all whitespace-nowrap ${activeSub === 'Marine Sewa' ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-sm' : 'bg-white border-slate-200 text-slate-500'}`}
+                    >
+                      🎣 Marine Sewa
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">   
               {filteredProducts.length > 0 ? (    
                 filteredProducts.map((hasil) => ( 
-                  <div key={hasil.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col hover:shadow-md transition-shadow">
+                  <div key={hasil.name} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col hover:shadow-md transition-shadow">
                     
                     {/* BAGIAN GAMBAR DENGAN INPUT FILE TERSEMBUNYI */}
                     <div className="relative h-48 bg-gray-100">
@@ -406,8 +489,8 @@ Mohon dibantu prosesnya. Terima kasih!`);
                         alt={hasil.name} 
                         className="w-full h-full object-cover" 
                       />
-                      <span className={`absolute top-3 left-3 text-white text-[10px] font-black px-3 py-1.5 rounded-lg uppercase tracking-wider shadow-sm ${hasil.category?.toLowerCase() === 'marine' ? 'bg-blue-500' : 'bg-[#10B981]'}`}>
-                        {hasil.category || 'Agro'}
+                    <span className={`absolute top-3 left-3 text-white text-[10px] font-black px-3 py-1.5 rounded-lg uppercase tracking-wider shadow-sm ${(hasil.category?.toLowerCase().includes('marine') || hasil.category?.toLowerCase().includes('sapronel')) ? 'bg-blue-500' : 'bg-[#10B981]'}`}>
+                      {hasil.category || 'Agro'}
                       </span>
 
                       {/* Input File Tersembunyi Khusus Tiap Produk (Dipicu dari Tombol Edit) */}
@@ -449,12 +532,24 @@ Mohon dibantu prosesnya. Terima kasih!`);
                         <div className="flex gap-2">
                        {/* TOMBOL EDIT DENGAN PARAMETER LENGKAP */}
                           <button 
-                          onClick={() => handleEdit(hasil.id, hasil.price, hasil.name, hasil.location, hasil.image, hasil.unit)} 
-                       className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition shadow-sm"
-                       title="Edit Produk"
-                         >
+                        onClick={() => handleEdit(
+                          hasil.id, 
+                          hasil.price, 
+                          hasil.name, 
+                          hasil.location, 
+                          hasil.image, 
+                          hasil.unit,
+                          hasil.category, // Tambahkan ini
+                          hasil.tipe,     // Tambahkan ini
+                          hasil.description, // Tambahkan ini
+                          hasil.stock        // Tambahkan ini
+                        )} 
+                        className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition"
+                          title="Edit Produk"
+                      >
                         <Pencil className="w-5 h-5" />
-                        </button>
+                      </button>
+
                           <button 
                             onClick={() => handleHapus(hasil.id, hasil.name)} 
                             className="p-2.5 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition shadow-sm"
@@ -480,6 +575,9 @@ Mohon dibantu prosesnya. Terima kasih!`);
         {activeMenu === 'ringkasan' && (
           <div className="space-y-8">
             <div>
+              <h1 className="text-2xl font-black text-slate-800 tracking-tight">
+               Ringkasan Bisnis
+               </h1>
               <p className="text-gray-500 mt-1">Berikut adalah ringkasan performa penjualan Anda minggu ini.</p>
             </div>
 
@@ -621,21 +719,48 @@ Mohon dibantu prosesnya. Terima kasih!`);
                           className="text-sm font-bold text-right text-gray-900 bg-transparent focus:outline-none focus:text-emerald-600 w-full max-w-[200px] md:max-w-xs"
                         />
                       </div>
+                
+                        {/* 1. Input Deskripsi */}
+                      <div className="py-3 border-b border-gray-100">
+                        <span className="text-sm font-semibold text-gray-500 block mb-2">Deskripsi</span>
+                        <textarea 
+                          value={editFormData.description} 
+                          onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                          className="w-full text-sm text-gray-900 bg-gray-50 p-2 rounded-lg focus:outline-emerald-600 border border-gray-200"
+                          rows="3"
+                        />
+                      </div>
 
-                      {/* Dropdown Pilihan Satuan */}
+                      {/* 2. Input Stok (Hanya tampil jika bukan Jasa) */}
+                    {editFormData.tipe !== 'jasa' && (
+                    <div className="flex items-center justify-between py-3 border-b border-gray-100">
+                      <span className="text-sm font-semibold text-gray-500">
+                        {editFormData.tipe === 'sewa' ? 'Jumlah Unit' : 'Jumlah Stok'}
+                      </span>
+                      <input 
+                        type="number" 
+                        value={editFormData.stock} 
+                        onChange={(e) => setEditFormData({ ...editFormData, stock: e.target.value })} 
+                        className="text-sm font-bold text-right text-gray-900 bg-transparent focus:outline-none focus:text-emerald-600 w-full max-w-[100px]" 
+                      />
+                    </div>
+                  )}
+
+                      {/* 3. Dropdown Satuan Dinamis */}
                       <div className="flex items-center justify-between py-3 border-b border-gray-100">
                         <span className="text-sm font-semibold text-gray-500">Satuan</span>
                         <select
-                          value={editFormData.unit || 'Kg'}
+                          value={editFormData.unit}
                           onChange={(e) => setEditFormData({ ...editFormData, unit: e.target.value })}
-                          className="text-sm font-bold text-right text-gray-900 bg-transparent focus:outline-none focus:text-emerald-600 cursor-pointer pr-1"
+                          className="text-sm font-bold text-right text-gray-900 bg-transparent focus:outline-none focus:text-emerald-600 cursor-pointer"
                         >
-                          <option value="Kg">Kg</option>
-                          <option value="Liter">Liter</option>
-                          <option value="Ikat">Ikat</option>
-                          <option value="Ekor">Ekor</option>
+                          {(unitMapping[editFormData.category] || ['Kg', 'Liter', 'Ikat', 'Pcs']).map(u => (
+                            <option key={u} value={u}>{u}</option>
+                          ))}
                         </select>
                       </div>
+
+                       </div>
                     </div>
                   </div>
 
@@ -644,7 +769,6 @@ Mohon dibantu prosesnya. Terima kasih!`);
 
             </div>
           </div>
-        </div>
       )}
       {/* JENDELA POP-UP PRATINJAU GAMBAR (FIXED: SEMUA ELEMEN RAPAT DI TENGAH) */}
       {showImagePreviewer && (

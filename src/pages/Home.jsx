@@ -5,7 +5,7 @@ import MarketTicker from '../components/marketplace/MarketTicker';
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-white font-sans">
+    <div className="w-ful bg-white font-sans">
       <MarketTicker />
 
       {/* HERO SECTION */}
@@ -21,14 +21,14 @@ export default function Home() {
             </div>
 
             <h1 className="text-5xl md:text-7xl font-black text-slate-900 tracking-tight leading-tight mb-6">
-              Dari Pesisir & Ladang, <br className="hidden md:block"/>
+              Mempermudah Dustribusi, <br className="hidden md:block"/>
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-blue-600">
-                Langsung ke Tangan Anda.
+                Membantu Produksi.
               </span>
             </h1>
 
             <p className="text-lg md:text-xl text-slate-500 mb-10 max-w-2xl mx-auto">
-              AgroMarina Direct memotong jalur distribusi panjang. Kami menghubungkan nelayan dan petani langsung dengan harga yang adil.
+              AgroMarina Direct Platform Distribusi dan penunjang Produksi. Kami menghubungkan hasil nelayan dan petani langsung dengan anda. dan juga menyediakan sarana,sewa dan jasa untuk kebutuhan Petani dan Nelayan
             </p>
 
             <div className="flex flex-col sm:flex-row justify-center items-center space-y-4 sm:space-y-0 sm:space-x-4">
