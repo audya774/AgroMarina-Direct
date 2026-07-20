@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Search, Package, Leaf, Anchor, X } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom'; // 🟢 useNavigate dihapus karena tidak dipakai
+import { Search, Package, Leaf, Anchor } from 'lucide-react'; // 🟢 X dihapus
 import { supabase } from '../services/supabase';
 import ProductCard from '../components/marketplace/ProductCard'; 
+
 const unitMapping = {
   'Bumi Agro': ['Kg', 'Liter', 'Ikat', 'Butir'],
   'Saprotan': ['Liter', 'Kg', 'Botol', 'Pcs'],
@@ -17,10 +18,10 @@ const unitMapping = {
 export default function Marketplace() {
   const [searchParams] = useSearchParams();
   const categoryFromUrl = searchParams.get('category');
-  const navigate = useNavigate();
+  
   const [products, setProducts] = useState([]);
-  const [activeSector, setActiveSector] = useState('semua'); // 🟢 State Sektor Utama: 'semua', 'agro', 'marine'
-  const [activeSub, setActiveSub] = useState('Bumi Agro'); // 🟢 State Sub-Kategori aktif
+  const [activeSector, setActiveSector] = useState('semua'); 
+  const [activeSub, setActiveSub] = useState('Bumi Agro'); 
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -74,10 +75,6 @@ export default function Marketplace() {
     }
   };
 
-  // Ketika gambar produk di dalam ProductCard diklik
-    const handleProductClick = (product) => {
-    navigate(`/product/${encodeURIComponent(product.name)}`); 
-  };
   // Kirim ulasan dengan validasi ID Pesanan
   const handleSendReview = async (e) => {
     e.preventDefault();
@@ -122,20 +119,16 @@ export default function Marketplace() {
     }
   };
 
-  // 🟢 LOGIKA FILTER HASIL ROMBAK TOTAL (Sektor + Sub-kategori Swipe + Pencarian)
+  // 🟢 LOGIKA FILTER HASIL ROMBAK TOTAL
   const filteredProducts = products.filter(product => {
     const matchSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
     
-    if (activeSector === 'semua') {
-      return matchSearch;
-    }
+    if (activeSector === 'semua') return matchSearch;
     
-    // Jika berada di Sektor Agro, pastikan datanya cocok dengan sub-kategori yang aktif
     if (activeSector === 'agro') {
       return matchSearch && product.category?.toLowerCase().includes(activeSub.toLowerCase());
     }
     
-    // Jika berada di Sektor Marine, pastikan datanya cocok dengan sub-kategori yang aktif
     if (activeSector === 'marine') {
       return matchSearch && product.category?.toLowerCase().includes(activeSub.toLowerCase());
     }
@@ -157,7 +150,7 @@ export default function Marketplace() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
               <input
                 type="text"
-                placeholder="Cari ikan, kopi, udang..."
+                placeholder="Cari ikan, kopi, pupuk, joran..."
                 className="w-full pl-10 pr-4 py-2 bg-slate-100 rounded-xl outline-none"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -165,7 +158,7 @@ export default function Marketplace() {
             </div>
           </div>
 
-          {/* 🟢 NAVIGATION TIER 1: SEKTOR UTAMA (Agro & Marine Kembali Asli) */}
+          {/* 🟢 NAVIGATION TIER 1: SEKTOR UTAMA */}
           <div className="flex items-center gap-2 mt-6">
             <button 
               onClick={() => setActiveSector('semua')} 
@@ -187,7 +180,7 @@ export default function Marketplace() {
             </button>
           </div>
 
-          {/* 🟢 NAVIGATION TIER 2: SUB-KATEGORI SWIPE (Opsi Dinamis Berdasarkan Sektor) */}
+          {/* 🟢 NAVIGATION TIER 2: SUB-KATEGORI SWIPE */}
           {activeSector !== 'semua' && (
             <div className="flex items-center gap-3 mt-4 overflow-x-auto pb-2 scroll-smooth snap-x snap-mandatory [-ms-overflow-style:none] [scrollbar-width:none]">
               {activeSector === 'agro' ? (
@@ -241,9 +234,8 @@ export default function Marketplace() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {filteredProducts.map((product) => (
               <ProductCard 
-                key={product.name} 
+                key={product.id || product.name} 
                 product={product} 
-                onImageClick={handleProductClick} 
               />
             ))}
           </div>

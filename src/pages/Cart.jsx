@@ -1,58 +1,90 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Trash2, MapPin, Store, Wrench, CalendarClock, Minus, Plus } from 'lucide-react'; 
+import { Trash2, MapPin, Store, Wrench, CalendarClock, Minus, Plus, ShoppingCart, CheckCircle2 } from 'lucide-react'; 
 import { useCart } from '../context/CartContext'; 
 import { supabase } from '../services/supabase'; 
 
 const Cart = () => {
   const navigate = useNavigate();
-  const { cart, removeFromCart, updateQuantity, syncWithDatabase } = useCart();
+  const { cart, removeFromCart, updateQuantity, updateDuration, syncWithDatabase } = useCart();
+  
+  // 🟢 State untuk melacak item mana yang dipilih untuk ringkasan belanja & checkout
+  const [selectedItemId, setSelectedItemId] = useState(null);
+
+  useEffect(() => {
+    if (cart.length > 0 && !selectedItemId) {
+      setSelectedItemId(cart[0].id || cart[0].name);
+    } else if (cart.length === 0) {
+      setSelectedItemId(null);
+    }
+  }, [cart, selectedItemId]);
   
   useEffect(() => {
     const fetchLatestData = async () => {
-      // Jika keranjang kosong, tidak perlu cek database
       if (cart.length === 0) return;
 
-      // 1. Kumpulkan semua ID barang yang ada di keranjang
       const itemIds = cart.map(item => item.id);
-
-      // 2. Tarik data TERBARU dari Supabase HANYA untuk barang-barang tersebut
       const { data, error } = await supabase
-        .from('products') // ⚠️ GANTI dengan nama tabel produk Anda di Supabase
+        .from('products') 
         .select('id, stock, price')
         .in('id', itemIds);
 
-      // 3. Jika berhasil, kirim data terbaru ke Context untuk diperbarui
       if (data && !error) {
         syncWithDatabase(data);
       }
     };
 
     fetchLatestData();
-  }, []); // Array kosong [] memastikan ini hanya berjalan 1x saat keranjang dibuka
+  }, []); 
 
-  const totalHarga = cart.reduce((total, item) => total + (item.price * (item.qty || 1)), 0);
+  // 🟢 Hanya menghitung harga dari item yang sedang dipilih/aktif saja
+  const activeItem = cart.find(item => (item.id || item.name) === selectedItemId) || cart[0];
+
+  const totalHarga = activeItem ? (
+    activeItem.price * 
+    (activeItem.qty || 1) * 
+    (activeItem.tipe === 'sewa' ? (activeItem.duration || 1) : 1)
+  ) : 0;
 
   const handleWhatsAppCheckout = () => {
-    if (cart.length === 0) return alert('Keranjang masih kosong!');
+    if (!activeItem) return alert('Keranjang masih kosong!');
 
-    const daftarBarang = cart.map((item) => 
-      `- ${item.name} (${item.qty || 1} ${item.unit || 'Item'})`
-    ).join('\n');
+    const isJasa = activeItem.tipe === 'jasa';
+    const qty = activeItem.qty || 1;
+    const dur = activeItem.duration || 1;
+    const unitStr = activeItem.unit || (isJasa ? 'Hari' : 'Item');
 
-    const textPesanan = encodeURIComponent(
-      `Halo, saya melihat lapak Anda di AgroMarina Direct dan ingin memesan:\n\n` +
-      `Daftar Pesanan:\n${daftarBarang}\n\n` +
-      `🛒 Total Belanja: Rp ${totalHarga.toLocaleString('id-ID')}\n\n` +
-      `🤝 Rencana COD/Pengiriman:\nNama Saya: ...\nAlamat/Titik Ketemuan: ...\n\nApakah stok/unit tersedia?`
-    );
+    let daftarBarang = '';
+    if (activeItem.tipe === 'sewa') {
+      daftarBarang = `- ${activeItem.name} (${qty} Unit, Durasi: ${dur} ${unitStr})`;
+    } else {
+      daftarBarang = `- ${activeItem.name} (${qty} ${unitStr})`;
+    }
+
+    let textPesanan = '';
+
+    if (isJasa) {
+      textPesanan = encodeURIComponent(
+        `Halo, saya melihat layanan Anda di AgroMarina Direct dan ingin memesan:\n\n` +
+        `Daftar Layanan:\n${daftarBarang}\n\n` +
+        `💰 Estimasi Biaya: Rp ${totalHarga.toLocaleString('id-ID')}\n\n` +
+        `🤝 Rencana Pelaksanaan (Bayar di Tempat):\nNama Saya: ...\nLokasi Pengerjaan: ...\nRencana Tanggal/Waktu: ...\n\nApakah Anda tersedia untuk jadwal tersebut?`
+      );
+    } else {
+      textPesanan = encodeURIComponent(
+        `Halo, saya melihat lapak Anda di AgroMarina Direct dan ingin memesan:\n\n` +
+        `Daftar Pesanan:\n${daftarBarang}\n\n` +
+        `🛒 Total Belanja: Rp ${totalHarga.toLocaleString('id-ID')}\n\n` +
+        `🤝 Rencana COD/Pengiriman:\nNama Saya: ...\nAlamat/Titik Ketemuan: ...\n\nApakah stok/unit tersedia?`
+      );
+    }
     
     window.open(`https://wa.me/6281361293319?text=${textPesanan}`, '_blank');
   };
 
   const handleSystemCheckout = () => {
     if (cart.length === 0) return alert('Keranjang masih kosong!');
-    navigate('/checkout'); 
+    navigate('/checkout', { state: { selectedItemId } }); 
   };
   
   return (
@@ -70,7 +102,8 @@ const Cart = () => {
             </div>
           ) : (
             cart.map((item) => {
-              // LOGIKA KUSTOMISASI KOTAK
+              const isSelected = selectedItemId === (item.id || item.name);
+
               let typeColor = 'border-l-emerald-500';
               let typeBadge = 'bg-emerald-100 text-emerald-700';
               let typeIcon = <Store className="w-3 h-3" />;
@@ -88,23 +121,18 @@ const Cart = () => {
                 typeText = 'Sewa';
               }
 
-              // LOGIKA STOK, SISA, DAN BATAS MAKSIMAL
               const currentStock = item.stock || 0;
               const currentQty = item.qty || 1;
               const unit = item.unit || 'Item';
               const remainingStock = Math.max(0, currentStock - currentQty);
-              
-              // Jika tipe jasa, kita anggap tidak ada batas limit (999). Jika barang fisik, pakai stok yang ada.
               const maxLimit = item.tipe === 'jasa' ? 999 : (item.stock || 999);
-
-              // 🟢 FUNGSI KURANG
+              
               const handleDecrease = () => {
                 if (currentQty > 1 && updateQuantity) {
                    updateQuantity(item.id || item.name, currentQty - 1);
                 }
               };
 
-              // 🟢 FUNGSI TAMBAH (Dengan Pengecekan Stok)
               const handleIncrease = () => {
                 if (currentQty >= maxLimit) {
                   alert(`Maaf, stok maksimal untuk ${item.name} hanya ${maxLimit} ${unit}.`);
@@ -115,118 +143,164 @@ const Cart = () => {
                 }
               };
 
-              // 🟢 FUNGSI KETIK MANUAL (Dengan Validasi Pintar)
               const handleManualInput = (e) => {
                 const inputValue = e.target.value;
-                
-                // Jika input dikosongkan secara manual, kita setel sementara ke 1 
                 if (inputValue === '') {
                   updateQuantity(item.id || item.name, 1);
                   return;
                 }
 
                 const numValue = parseInt(inputValue, 10);
-
                 if (numValue > maxLimit) {
-                  // Tolak jika melebihi batas dan kembalikan ke angka maksimal
                   alert(`Stok tidak mencukupi! Sisa stok hanya ${maxLimit} ${unit}.`);
                   updateQuantity(item.id || item.name, maxLimit);
                 } else if (numValue < 1) {
-                  // Cegah angka minus atau nol
                   updateQuantity(item.id || item.name, 1);
                 } else {
-                  // Jika aman, masukkan angkanya
                   updateQuantity(item.id || item.name, numValue);
                 }
               };
+             
+              const currentDuration = item.duration || 1;
+              const maxDuration = 7; // 🟢 Durasi maksimal diset ke 7 hari
+              
+              const itemSubtotal = item.tipe === 'sewa' 
+                ? (item.price * currentQty * currentDuration) 
+                : (item.price * currentQty);
+
+              const handleDecreaseDuration = () => {
+                if (currentDuration > 1 && updateDuration) updateDuration(item.id || item.name, currentDuration - 1);
+              };
+              const handleIncreaseDuration = () => {
+                if (currentDuration >= maxDuration) return alert(`Maksimal durasi sewa adalah ${maxDuration} ${unit}.`);
+                if (updateDuration) updateDuration(item.id || item.name, currentDuration + 1);
+              };
+              const handleManualDuration = (e) => {
+                const val = e.target.value;
+                if (val === '') return updateDuration(item.id || item.name, 1);
+                const num = parseInt(val, 10);
+                if (num > maxDuration) {
+                  alert(`Maksimal durasi sewa adalah ${maxDuration} ${unit}.`);
+                  updateDuration(item.id || item.name, maxDuration);
+                } else if (num < 1) updateDuration(item.id || item.name, 1);
+                else updateDuration(item.id || item.name, num);
+              };
+
+              const cardStyle = isSelected 
+                ? `bg-white p-4 rounded-xl shadow-md border-y border-r border-gray-100 border-l-4 ${typeColor} ring-1 ring-emerald-400 transition-all mb-4 cursor-pointer`
+                : `bg-gray-50/70 p-4 rounded-xl shadow-sm border border-gray-100 border-l-4 ${typeColor} opacity-75 hover:opacity-100 transition-all mb-4 cursor-pointer`;
 
               return (
-                <div 
-                  key={item.id || item.name} 
-                  className={`bg-white p-4 rounded-xl shadow-sm flex items-start justify-between border-y border-r border-gray-100 border-l-4 ${typeColor} transition-all hover:shadow-md`}
-                >
+                <div key={item.id || item.name} className={cardStyle} onClick={() => setSelectedItemId(item.id || item.name)}>
                   
-                  {/* --- BAGIAN KIRI KARTU --- */}
-                  <div className="flex items-start gap-4">
-                    <img src={item.image || "https://via.placeholder.com/80"} alt={item.name} className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg bg-gray-100 shrink-0" />
-                    <div>
-                      {/* Badge Tipe */}
-                      <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold w-fit mb-1 ${typeBadge}`}>
-                        {typeIcon} {typeText}
+                  {/* --- BARIS 1: INFO PRODUK (ATAS) --- */}
+                  <div className="flex gap-3 w-full">
+                    <img src={item.image || "https://via.placeholder.com/80"} alt={item.name} className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-xl bg-gray-100 shrink-0 border border-gray-100" />
+                    
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start gap-2">
+                        <div className="min-w-0">
+                          <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold w-fit mb-1 ${typeBadge}`}>
+                            {typeIcon} {typeText}
+                          </div>
+                          <h4 className="font-bold text-gray-800 text-sm sm:text-base truncate" title={item.name}>{item.name}</h4>
+                        </div>
+                      </div>
+                      
+                      <p className="text-xs text-gray-500 mt-1 flex items-center gap-1 truncate">
+                        <MapPin className="w-3 h-3 shrink-0 text-gray-400" /> {item.location || 'AgroMarina'}
+                      </p>
+                      
+                      {/* Harga & Tombol Aksi di Pojok Kanan Bawah */}
+                      <div className="mt-2 flex items-end justify-between">
+                        <div>
+                          <p className="text-[#10B981] font-bold text-sm sm:text-base">
+                            Rp {Number(item.price).toLocaleString('id-ID')} 
+                            <span className="text-gray-400 font-medium text-[10px] sm:text-xs ml-1">
+                              {item.tipe === 'sewa' ? `x ${currentQty} Unit x ${currentDuration} ${unit}` : `x ${currentQty} ${unit}`}
+                            </span>
+                          </p>
+
+                          {item.tipe !== 'jasa' && (
+                            <div className="mt-1 flex items-center gap-2 text-[9px] sm:text-[10px] font-bold bg-white px-2 py-1 rounded-md w-fit border border-gray-100">
+                              <span className="text-gray-500">Stok: {currentStock}</span>
+                              <span className="text-gray-300">|</span>
+                              <span className={`${remainingStock === 0 ? 'text-red-500' : 'text-emerald-600'}`}>Sisa: {remainingStock}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 🟢 Ikon Keranjang & Sampah di Samping Kanan Bawah */}
+                        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                          <button 
+                            onClick={() => setSelectedItemId(item.id || item.name)} 
+                            className={`p-1.5 rounded-lg transition shadow-sm ${isSelected ? 'bg-emerald-600 text-white' : 'bg-white border border-gray-200 text-gray-400 hover:text-emerald-600'}`}
+                            title={isSelected ? 'Dipilih' : 'Pilih Item Ini'}
+                          >
+                            {isSelected ? <CheckCircle2 className="w-4 h-4" /> : <ShoppingCart className="w-4 h-4" />}
+                          </button>
+
+                          <button 
+                            onClick={() => removeFromCart(item.id || item.name)} 
+                            className="p-1.5 bg-white border border-gray-200 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg shadow-sm transition" 
+                            title="Hapus dari keranjang"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
 
-                      <h4 className="font-bold text-gray-800">{item.name}</h4>
-                      
-                      <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                        <MapPin className="w-3 h-3 shrink-0 text-gray-400" /> Lokasi: {item.location || 'AgroMarina'}
-                      </p>
-                      
-                      <p className="text-[#10B981] font-bold mt-2">
-                        Rp {Number(item.price).toLocaleString('id-ID')} <span className="text-gray-400 font-medium text-sm">x {currentQty} {unit}</span>
-                      </p>
-
-                      {/* INFO STOK & SISA */}
-                      {item.tipe !== 'jasa' && (
-                        <div className="mt-2 flex items-center gap-2 text-[10px] font-bold bg-gray-50 px-2 py-1 rounded-lg w-fit border border-gray-100">
-                          <span className="text-gray-500">
-                            {item.tipe === 'sewa' ? 'Unit' : 'Stok'}: {currentStock} {unit}
-                          </span>
-                          <span className="text-gray-300">|</span>
-                          <span className={`${remainingStock === 0 ? 'text-red-500' : 'text-emerald-600'}`}>
-                            Sisa: {remainingStock} {unit}
-                          </span>
-                        </div>
-                      )}
                     </div>
                   </div> 
                   
-                  {/* --- BAGIAN KANAN KARTU --- */}
-                  <div className="flex flex-col items-end justify-between h-full min-h-[80px]">
-                    <p className="font-black text-gray-800 text-lg">Rp {(item.price * currentQty).toLocaleString('id-ID')}</p>
+                  {/* --- BARIS 2: KONTROL & SUBTOTAL (BAWAH) --- */}
+                  <div className="mt-4 pt-3 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4" onClick={(e) => e.stopPropagation()}>
                     
-                    {/* AREA KONTROL: Kuantitas & Hapus */}
-                    <div className="flex items-center gap-3 mt-auto pt-4">
-                      
-                      {/* Kontrol Kuantitas Input Manual */}
-                      <div className="flex items-center bg-gray-100 rounded-lg p-1 border border-gray-200 focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-500 transition-all">
-                        <button 
-                          onClick={handleDecrease}
-                          disabled={currentQty <= 1}
-                          className="p-1 text-gray-600 hover:text-emerald-600 disabled:opacity-30 transition"
-                        >
-                          <Minus className="w-4 h-4 sm:w-5 sm:h-5" />
-                        </button>
-                        
-                        {/* 🟢 INPUT KETIK MANUAL */}
-                        <input
-                          type="number"
-                          value={currentQty}
-                          onChange={handleManualInput}
-                          className="w-8 text-center text-sm font-bold text-gray-800 bg-transparent outline-none p-0 m-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        />
-                        <span className="text-[10px] font-medium text-gray-500 mr-2">{unit}</span>
-                        
-                        <button 
-                          onClick={handleIncrease}
-                          disabled={currentQty >= maxLimit}
-                          className="p-1 text-gray-600 hover:text-emerald-600 disabled:opacity-30 transition"
-                        >
-                          <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
-                        </button>
-                      </div>
+                    {/* Area Kontrol (-/+) Menyamping */}
+                    <div className="w-full sm:w-auto">
+                      {item.tipe === 'sewa' ? (
+                        <div className="flex flex-row items-center gap-2 sm:gap-4 overflow-x-auto py-1">
+                          {/* Unit */}
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Unit:</span>
+                            <div className="flex items-center bg-gray-50 rounded-lg p-1 border border-gray-200">
+                              <button onClick={handleDecrease} disabled={currentQty <= 1} className="p-1 text-gray-600 disabled:opacity-30"><Minus className="w-3 h-3" /></button>
+                              <input type="number" value={currentQty} onChange={handleManualInput} className="w-6 text-center text-xs font-bold text-gray-800 bg-transparent outline-none p-0 m-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none" />
+                              <button onClick={handleIncrease} disabled={currentQty >= maxLimit} className="p-1 text-gray-600 disabled:opacity-30"><Plus className="w-3 h-3" /></button>
+                            </div>
+                          </div>
 
-                      {/* Tombol Hapus */}
-                      <button 
-                        onClick={() => removeFromCart(item.id || item.name)} 
-                        className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
-                        title="Hapus dari keranjang"
-                      >
-                        <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
-                      </button>
-
+                          {/* Durasi */}
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Durasi:</span>
+                            <div className="flex items-center bg-gray-50 rounded-lg p-1 border border-gray-200">
+                              <button onClick={handleDecreaseDuration} disabled={currentDuration <= 1} className="p-1 text-gray-600 disabled:opacity-30"><Minus className="w-3 h-3" /></button>
+                              <input type="number" value={currentDuration} onChange={handleManualDuration} className="w-6 text-center text-xs font-bold text-gray-800 bg-transparent outline-none p-0 m-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none" />
+                              <span className="text-[10px] font-medium text-gray-500 mr-1">{unit}</span>
+                              <button onClick={handleIncreaseDuration} disabled={currentDuration >= maxDuration} className="p-1 text-gray-600 disabled:opacity-30"><Plus className="w-3 h-3" /></button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between sm:justify-start gap-4">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase w-12 sm:hidden tracking-wider">Jumlah:</span>
+                          <div className="flex items-center bg-gray-50 rounded-lg p-1 border border-gray-200">
+                            <button onClick={handleDecrease} disabled={currentQty <= 1} className="p-1.5 text-gray-600 disabled:opacity-30"><Minus className="w-3 h-3 sm:w-4 sm:h-4" /></button>
+                            <input type="number" value={currentQty} onChange={handleManualInput} className="w-8 text-center text-xs sm:text-sm font-bold text-gray-800 bg-transparent outline-none p-0 m-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none" />
+                            <span className="text-[10px] font-medium text-gray-500 mr-2">{unit}</span>
+                            <button onClick={handleIncrease} disabled={currentQty >= maxLimit} className="p-1.5 text-gray-600 disabled:opacity-30"><Plus className="w-3 h-3 sm:w-4 sm:h-4" /></button>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
 
+                    {/* Area Subtotal */}
+                    <div className="flex items-center justify-between sm:block border-t border-gray-50 sm:border-none pt-3 mt-2 sm:pt-0 sm:mt-0">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase sm:hidden tracking-wider">Subtotal:</span>
+                      <p className="font-black text-emerald-600 text-lg">Rp {itemSubtotal.toLocaleString('id-ID')}</p>
+                    </div>
+
+                  </div>
                 </div>
               );
             })
@@ -238,7 +312,10 @@ const Cart = () => {
           <h3 className="text-lg font-bold text-gray-800 mb-4">Ringkasan Pesanan</h3>
           
           <div className="flex justify-between items-center mb-6 border-t border-gray-200 pt-4">
-            <span className="text-gray-600 font-medium">Total Harga</span>
+            <div className="flex flex-col">
+              <span className="text-gray-600 font-medium">Total Harga</span>
+              <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-md mt-0.5 w-fit">1 Item Terpilih</span>
+            </div>
             <span className="text-xl font-black text-[#1E293B]">Rp {totalHarga.toLocaleString('id-ID')}</span>
           </div>
 

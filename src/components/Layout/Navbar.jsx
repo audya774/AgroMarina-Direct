@@ -1,20 +1,51 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { supabase } from '../../services/supabase'; 
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
 
-  const handleMitraPanelClick = () => {
+  // 🟢 FUNGSI KLIK KERANJANG DI NAVBAR
+  const handleCartClick = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      alert('Silakan login atau daftar akun terlebih dahulu untuk melihat keranjang.');
+      navigate('/login');
+    } else {
+      navigate('/cart');
+    }
+  };
+
+  // 🟢 FUNGSI KLIK MITRAPANEL (Gabungan Buka Sidebar & Cek Role)
+  const handleMitraPanelClick = async () => {
     setIsMenuOpen(false); // Tutup dropdown menu
     
-    // Cek apakah sudah di halaman dashboard
-    if (window.location.pathname === '/dashboard-mitra') {
-      // Kirim sinyal buka ke DashboardMitra
-      window.dispatchEvent(new Event('bukaSidebar'));
+    // Cek sesi login
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session) {
+      // Jika belum login, ke halaman daftar mitra
+      navigate('/login-mitra');
     } else {
-      // Jika di halaman lain, pindah ke dashboard
-      navigate('/dashboard-mitra');
+      // Jika sudah login, cek role di database
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', session.user.id)
+        .single();
+
+      if (profile?.role === 'mitra' || profile?.role === 'admin') {
+        // Jika sudah mitra, buka dashboard
+        if (window.location.pathname === '/dashboard-mitra') {
+          window.dispatchEvent(new Event('bukaSidebar'));
+        } else {
+          navigate('/dashboard-mitra');
+        }
+      } else {
+        // Jika pembeli biasa, ke halaman daftar mitra
+        navigate('/login-mitra');
+      }
     }
   };
 
@@ -47,10 +78,23 @@ export default function Navbar() {
           </Link>
         </div>
 
-        {/* KANAN: Tombol Login */}
-        <Link to="/auth" className="bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm hover:bg-emerald-600">
-          Masuk / Daftar
-        </Link>
+        {/* KANAN: Tombol Keranjang & Login */}
+        <div className="flex items-center gap-3">
+          {/* Tombol Keranjang Navbar */}
+          <button 
+            onClick={handleCartClick}
+            className="p-2 text-slate-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-full transition-colors"
+            title="Lihat Keranjang"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+          </button>
+
+          <Link to="/auth" className="bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm hover:bg-emerald-600">
+            Masuk
+          </Link>
+        </div>
       </div>
 
       {/* DROPDOWN MENU BERSIH */}
@@ -71,13 +115,13 @@ export default function Navbar() {
             
             <Link to="/jasa-agromarine" onClick={() => setIsMenuOpen(false)} className="text-slate-700 hover:text-emerald-600 hover:pl-2 font-semibold transition-all">
               Jasa Agromarine
-             </Link>
+            </Link>
             
-             <Link to="/pusat-sewa" onClick={() => setIsMenuOpen(false)} className="text-slate-700 hover:text-emerald-600 hover:pl-2 font-semibold transition-all">
+            <Link to="/pusat-sewa" onClick={() => setIsMenuOpen(false)} className="text-slate-700 hover:text-emerald-600 hover:pl-2 font-semibold transition-all">
               Pusat Sewa
-              </Link>           
+            </Link>           
             
-            {/* Tombol MitraPanel yang sudah diedit */}
+            {/* Tombol MitraPanel */}
             <button 
               onClick={handleMitraPanelClick}
               className="text-slate-700 hover:text-emerald-600 hover:pl-2 font-semibold transition-all text-left"

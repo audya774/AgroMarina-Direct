@@ -113,7 +113,7 @@ export default function UploadForm() {
             description: formData.description,
             // Jika Jasa, stok akan bernilai null agar tidak tersimpan sebagai 0
             stock: tipe === 'jasa' ? null : parseInt(formData.stock, 10),
-            stock_unit: tipe === 'jasa' ? null : formData.unit,
+            stock_unit: tipe === 'jasa' ? null : (tipe === 'sewa' ? 'Unit' : formData.unit),
             image: urlData.publicUrl
           }
         ]);
@@ -208,7 +208,7 @@ export default function UploadForm() {
               onChange={(e) => setFormData({...formData, stock: e.target.value})} 
             />
             <span className="text-sm font-bold text-slate-500 border-l border-slate-300 pl-3 ml-1 whitespace-nowrap">
-              {formData.unit}
+              {tipe === 'sewa' ? 'Unit' : formData.unit}
             </span>
           </div>
         )}

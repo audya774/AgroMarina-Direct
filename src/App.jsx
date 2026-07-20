@@ -11,7 +11,8 @@ import ProtectedRoute from './components/common/ProtectedRoute';
 
 // Import Halaman
 import Home from './pages/Home';
-import Auth from './pages/Auth';
+import Auth from './pages/Auth'; // 🟢 Cukup satu Auth di sini
+import LoginMitra from './pages/LoginMitra'; 
 import Marketplace from './pages/Marketplace';
 import ProductDetail from './pages/ProductDetail';
 import Cart from './pages/Cart';
@@ -24,7 +25,7 @@ function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
-    // 🟢 Bungkus seluruh aplikasi dengan CartProvider agar keranjang bisa "menyimpan" data
+    // Bungkus seluruh aplikasi dengan CartProvider agar keranjang bisa "menyimpan" data
     <CartProvider>
       <Router>
         <div className="flex flex-col min-h-screen font-sans text-gray-800 bg-gray-50 overflow-x-hidden">
@@ -40,8 +41,13 @@ function App() {
               <Route path="/product/:id" element={<ProductDetail />} />
               <Route path="/cart" element={<Cart />} />
               <Route path="/checkout" element={<Checkout />} />
+              
+              {/* Rute Autentikasi */}
               <Route path="/auth" element={<Auth />} />
+              <Route path="/login" element={<Auth />} /> 
+              <Route path="/login-mitra" element={<LoginMitra />} />
 
+              {/* Rute Terlindungi Khusus Mitra */}
               <Route 
                 path="/dashboard-mitra" 
                 element={

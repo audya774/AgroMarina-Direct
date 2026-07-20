@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
-import { Leaf, Anchor } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Leaf, Anchor, Search } from 'lucide-react'; // 🟢 Tambahkan Search
 
 // 🟢 Mengimpor desain kartu yang sudah kita buat sebelumnya
 import ProductCard from '../components/marketplace/ProductCard';
@@ -11,8 +10,8 @@ export default function PusatSewa() {
   const [activeSector, setActiveSector] = useState('Semua');
   const [loading, setLoading] = useState(true);
   
-  // 🟢 Menyiapkan fungsi navigasi untuk berpindah halaman
-  const navigate = useNavigate();
+  // 🟢 State untuk pencarian
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Mengambil data dari tabel database
   useEffect(() => {
@@ -36,26 +35,34 @@ export default function PusatSewa() {
     fetchRentals();
   }, []);
 
-  // Logika Filter
+  // 🟢 Logika Filter Ganda (Sektor + Pencarian)
   const filteredRentals = rentals.filter((item) => {
-    if (activeSector === 'Semua') return true;
-    return item.category?.toLowerCase().includes(activeSector.toLowerCase());
+    const matchSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
+    if (activeSector === 'Semua') return matchSearch;
+    return matchSearch && item.category?.toLowerCase().includes(activeSector.toLowerCase());
   });
-
-  // 🟢 Fungsi untuk menangani klik gambar (menuju halaman detail)
-  const handleImageClick = (product) => {
-    // Sesuaikan rute '/product/' ini jika Anda menggunakan rute yang berbeda di App.jsx
-    navigate(`/product/${product.name}`);
-  };
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans p-6 md:p-10">
       <div className="max-w-7xl mx-auto space-y-6">
         
-        {/* Header Halaman */}
-        <div>
-          <h1 className="text-2xl font-black text-slate-800 tracking-tight">Pusat Sewa Alat</h1>
-          <p className="text-sm text-gray-500 mt-1">Rental alat modern penunjang tani dan operasional nelayan.</p>
+        {/* 🟢 Header Halaman & Pencarian (Layout Kiri-Kanan) */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h1 className="text-2xl font-black text-slate-800 tracking-tight">Pusat Sewa Alat</h1>
+            <p className="text-sm text-gray-500 mt-1">Rental alat modern penunjang tani dan operasional nelayan.</p>
+          </div>
+          
+          <div className="relative w-full md:w-96">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Cari traktor, pompa, jaring..."
+              className="w-full pl-10 pr-4 py-2 bg-slate-100 rounded-xl outline-none"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
         </div>
 
         {/* Filter */}
@@ -68,7 +75,7 @@ export default function PusatSewa() {
                 : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
             }`}
           >
-            Semua Hasil
+            Semua 
           </button>
           
           <button 
@@ -101,11 +108,9 @@ export default function PusatSewa() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
             {filteredRentals.length > 0 ? (
               filteredRentals.map((item) => (
-                // 🟢 Memanggil komponen ProductCard yang seragam dengan halaman Pasar
                 <ProductCard 
                   key={item.id || item.name} 
                   product={item} 
-                  onImageClick={handleImageClick} 
                 />
               ))
             ) : (

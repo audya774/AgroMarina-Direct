@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
-import { Leaf, Anchor } from 'lucide-react'; // MapPin dihapus karena sudah diurus oleh ProductCard
-import { useNavigate } from 'react-router-dom';
+import { Leaf, Anchor, Search } from 'lucide-react'; // 🟢 Tambahkan ikon Search
 
 // 🟢 Mengimpor desain kartu utama
 import ProductCard from '../components/marketplace/ProductCard';
@@ -10,9 +9,9 @@ export default function JasaAgromarine() {
   const [services, setServices] = useState([]);
   const [activeSector, setActiveSector] = useState('Semua');
   const [loading, setLoading] = useState(true);
-
-  // 🟢 Menyiapkan fungsi navigasi
-  const navigate = useNavigate();
+  
+  // 🟢 State untuk menampung kata kunci pencarian
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Mengambil data dari tabel database
   useEffect(() => {
@@ -36,25 +35,35 @@ export default function JasaAgromarine() {
     fetchServices();
   }, []);
 
-  // Logika Filter 1 Tingkat 
+  // 🟢 Logika Filter Ganda (Berdasarkan Kategori Sektor & Teks Pencarian)
   const filteredServices = services.filter((item) => {
-    if (activeSector === 'Semua') return true;
-    return item.category?.toLowerCase().includes(activeSector.toLowerCase());
+    const matchSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    if (activeSector === 'Semua') return matchSearch;
+    return matchSearch && item.category?.toLowerCase().includes(activeSector.toLowerCase());
   });
-
-  // 🟢 Fungsi untuk menangani klik gambar (menuju halaman detail)
-  const handleImageClick = (product) => {
-    navigate(`/product/${product.name}`);
-  };
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans p-6 md:p-10">
       <div className="max-w-7xl mx-auto space-y-6">
         
-        {/* Header Halaman */}
-        <div>
-          <h1 className="text-2xl font-black text-slate-800 tracking-tight">Jasa Agromarine</h1>
-          <p className="text-sm text-gray-500 mt-1">Temukan penyedia jasa pertanian dan kelautan terpercaya.</p>
+        {/* 🟢 Header Halaman & Kolom Pencarian (Kiri Kanan) */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h1 className="text-2xl font-black text-slate-800 tracking-tight">Jasa Agromarine</h1>
+            <p className="text-sm text-gray-500 mt-1">Temukan penyedia jasa pertanian dan kelautan terpercaya.</p>
+          </div>
+          
+          <div className="relative w-full md:w-96">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Cari jasa panen, mekanik kapal..."
+              className="w-full pl-10 pr-4 py-2 bg-slate-100 rounded-xl outline-none"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
         </div>
 
         {/* 🌟 FILTER 1 TINGKAT */}
@@ -67,7 +76,7 @@ export default function JasaAgromarine() {
                 : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
             }`}
           >
-            Semua Hasil
+            Semua 
           </button>
           
           <button 
@@ -100,16 +109,15 @@ export default function JasaAgromarine() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
             {filteredServices.length > 0 ? (
               filteredServices.map((item) => (
-                // 🟢 Memanggil komponen ProductCard yang seragam
+                // 🟢 Memanggil komponen ProductCard yang cerdas
                 <ProductCard 
                   key={item.id || item.name} 
                   product={item} 
-                  onImageClick={handleImageClick} 
                 />
               ))
             ) : (
               <div className="col-span-full py-12 text-center bg-white rounded-2xl border border-dashed border-gray-300">
-                <p className="text-gray-500 font-medium">Belum ada layanan jasa di sektor ini.</p>     
+                <p className="text-gray-500 font-medium">Layanan jasa tidak ditemukan.</p>     
               </div>
             )}
           </div>

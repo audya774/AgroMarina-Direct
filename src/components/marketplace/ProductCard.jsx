@@ -1,29 +1,44 @@
 import React from 'react';
 import { MapPin, ShoppingCart } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { useCart } from '../../context/CartContext'; // 🟢 1. Import memori keranjang
+import { useNavigate, Link } from 'react-router-dom'; 
+import { useCart } from '../../context/CartContext'; 
+import { supabase } from '../../services/supabase'; // 🟢 1. Tambahkan import Supabase
 
-const ProductCard = ({ product, onImageClick }) => {
-  // 🟢 2. Panggil fungsi untuk menambah barang
+const ProductCard = ({ product }) => { 
   const { addToCart } = useCart(); 
-   const navigate = useNavigate();
+  const navigate = useNavigate();
   const isAgroSector = product.category === 'Bumi Agro' || product.category === 'Saprotan' || product.category === 'Agro Jasa' || product.category === 'Agro Sewa';
 
-  // 🟢 3. Buat fungsi klik keranjang yang sesungguhnya
-  const handleAddToCart = (e) => {
-    e.stopPropagation(); // Mencegah klik menyebar ke gambar
-    addToCart(product, 1); // Mengirim 1 item ke keranjang
-    navigate('/cart');
-    alert(`${product.name} berhasil ditambahkan ke keranjang!`);
+  // URL sudah diamankan dengan encodeURIComponent agar kebal terhadap spasi
+  const productUrl = `/product/${encodeURIComponent(product.name)}`;
+  
+  // 🟢 2. Ubah fungsi menjadi async agar bisa mengecek sesi dari database
+  const handleAddToCart = async (e) => {
+    e.preventDefault(); 
+    e.stopPropagation(); 
+
+    // 🟢 3. Cek status login pengguna
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session) {
+      // Jika belum login, cegah masuk keranjang dan arahkan ke login
+      alert('Silakan login atau daftar akun terlebih dahulu.');
+      navigate('/login');
+    } else {
+      // Jika sudah login, masukkan ke keranjang secara normal
+      addToCart(product, 1); 
+      navigate('/cart');
+      alert(`${product.name} berhasil ditambahkan ke keranjang!`);
+    }
   };
 
   return (
     <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between h-full">
       
-      {/* 📸 AREA GAMBAR */}
-      <div 
-        onClick={() => onImageClick && onImageClick(product)} 
-        className="relative h-48 bg-slate-100 cursor-pointer group"
+      {/* 📸 AREA GAMBAR (Dibungkus Link) */}
+      <Link 
+        to={productUrl} 
+        className="relative block h-48 bg-slate-100 cursor-pointer group"
         title="Klik untuk melihat detail & deskripsi produk"
       >
         {product.image && (
@@ -39,37 +54,51 @@ const ProductCard = ({ product, onImageClick }) => {
             Lihat Deskripsi
           </span>
         </div>
-      </div>
+      </Link>
 
       {/* INFO KONTEN PRODUK */}
       <div className="p-5 flex-1 flex flex-col justify-between">
         <div>
           <p className="text-[10px] text-slate-400 italic mb-2">Klik area gambar untuk membaca deskripsi</p>
-          <h3 className="font-bold text-lg text-slate-800 mb-1 line-clamp-1">{product.name}</h3>
+          
+          {/* Judul dibungkus Link agar teksnya bisa diklik */}
+          <Link to={productUrl}>
+            <h3 className="font-bold text-lg text-slate-800 mb-1 line-clamp-1 hover:text-emerald-600 transition-colors">
+              {product.name}
+            </h3>
+          </Link>
+          
           <div className="flex items-center gap-1 text-slate-500 text-xs mb-3">
             <MapPin className="w-3 h-3" /> <span className="line-clamp-1">{product.location}</span>
           </div>
         </div>
 
         <div className="flex items-end justify-between mt-4 pt-4 border-t border-slate-100">
-          {/* Harga */}
+          {/* Harga / Biaya */}
           <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Harga per {product.unit || 'Kg'}</p>
+            {/* Logika: Jika sewa/jasa tampilkan "Biaya", jika pasar tampilkan "Harga" */}
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              {product.tipe === 'sewa' || product.tipe === 'jasa' ? 'Biaya' : 'Harga'} per {product.unit || 'Kg'}
+            </p>
             <p className="text-xl font-black text-slate-800">Rp {Number(product.price).toLocaleString('id-ID')}</p>
           </div>
           
           {/* Informasi Stok & Tombol Keranjang */}
           <div className="flex items-center gap-3">
-            <div className="text-right">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tersedia</p>
-              <p className="font-bold text-sm text-slate-700">
-                {product.stock || 0} <span className="text-xs">{product.stock_unit || 'Item'}</span>
-              </p>
-            </div>
+            
+            {/* Logika: Sembunyikan tulisan "Tersedia" jika tipenya adalah jasa */}
+            {product.tipe !== 'jasa' && (
+              <div className="text-right">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tersedia</p>
+                <p className="font-bold text-sm text-slate-700">
+                  {product.stock || 0} <span className="text-xs">{product.tipe === 'sewa' ? 'Unit' : (product.stock_unit || product.unit || 'Item')}</span>
+                </p>
+              </div>
+            )}
             
             <button 
               type="button"
-              onClick={handleAddToCart} // 🟢 4. Panggil fungsi keranjang di sini
+              onClick={handleAddToCart}
               className={`p-3 rounded-xl text-white hover:opacity-90 active:scale-95 transition-all shadow-sm ${isAgroSector ? 'bg-emerald-500' : 'bg-blue-500'}`}
             >
               <ShoppingCart className="w-5 h-5" />

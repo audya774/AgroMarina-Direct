@@ -8,23 +8,26 @@ import {
   Wallet, 
   ArrowRight,
   Info,
-  Upload
+  Banknote
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { useCart } from '../context/CartContext'; // 🟢 Menghubungkan keranjang asli
-import { supabase } from '../services/supabase'; // 🟢 Menyiapkan Supabase
+import { useNavigate, useLocation } from 'react-router-dom'; // 🟢 Tambahkan useLocation
+import { useCart } from '../context/CartContext'; 
+import { supabase } from '../services/supabase'; 
 
 export default function Checkout() {
   const navigate = useNavigate();
-  const { cart, clearCart } = useCart(); // 🟢 Memanggil memori keranjang
+  const location = useLocation(); // 🟢 Menerima kiriman state dari Cart.jsx
+  const { cart, clearCart } = useCart(); 
   
   const [step, setStep] = useState(1);
   const [paymentMethod, setPaymentMethod] = useState('escrow');
-  const [receiptFile, setReceiptFile] = useState(null); // State untuk file struk
+  const [receiptFile, setReceiptFile] = useState(null); 
   const [isProcessing, setIsProcessing] = useState(false);
-  
-  // State untuk menyimpan total & resi setelah keranjang dikosongkan
   const [finalOrderInfo, setFinalOrderInfo] = useState(null);
+
+  // 🟢 Mendapatkan ID item yang dipilih dari Cart, atau default ke item pertama
+  const selectedItemId = location.state?.selectedItemId;
+  const activeItem = cart.find(i => (i.id || i.name) === selectedItemId) || cart[0];
 
   // State Formulir Data Pembeli
   const [formData, setFormData] = useState({
@@ -33,8 +36,13 @@ export default function Checkout() {
     alamat: 'Jl. Teuku Nyak Arief, Darussalam, Kec. Syiah Kuala, Kota Banda Aceh'
   });
 
-  // Menghitung Total dari keranjang asli
-  const subTotal = cart.reduce((sum, item) => sum + (item.price * (item.quantity || 1)), 0);
+  // 🟢 Menghitung subtotal HANYA dari item yang dipilih/aktif saja
+  const subTotal = activeItem ? (
+    activeItem.price * 
+    (activeItem.qty || 1) * 
+    (activeItem.tipe === 'sewa' ? (activeItem.duration || 1) : 1)
+  ) : 0;
+
   const shippingCost = 25000; 
   const total = subTotal > 0 ? subTotal + shippingCost : 0;
 
@@ -42,12 +50,11 @@ export default function Checkout() {
     if (e) e.preventDefault();
     
     if (step === 1) {
-      if (cart.length === 0) return alert('Keranjang Anda kosong!');
+      if (cart.length === 0 || !activeItem) return alert('Keranjang atau item pilihan kosong!');
       setStep(2);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } 
     else if (step === 2) {
-      // 🟢 Validasi Upload Struk jika memilih Transfer Bank
       if (paymentMethod === 'transfer' && !receiptFile) {
         alert('Mohon unggah bukti transfer/struk Anda terlebih dahulu.');
         return;
@@ -56,20 +63,15 @@ export default function Checkout() {
       setIsProcessing(true);
       
       try {
-        // TODO Nanti: Di sini tempat fungsi upload struk ke Supabase Storage
-        // dan fungsi insert ke tabel 'Pesanan' Supabase.
-        
-        // Simulasi proses loading sesaat
         await new Promise(resolve => setTimeout(resolve, 1500));
         
-        // Simpan data total untuk resi sebelum keranjang dihapus
         setFinalOrderInfo({
           orderId: `AM-${Math.floor(Math.random() * 10000)}-XYZ`,
           totalPaid: total,
           method: paymentMethod
         });
 
-        clearCart(); // 🟢 Kosongkan keranjang setelah sukses
+        clearCart(); 
         setStep(3);
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } catch (error) {
@@ -80,7 +82,6 @@ export default function Checkout() {
     }
   };
 
-  // Jika diakses tapi keranjang kosong (dan belum checkout sukses)
   if (cart.length === 0 && step < 3) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 text-center">
@@ -178,7 +179,6 @@ export default function Checkout() {
                       </div>
                     </label>
 
-                    {/* 🟢 Opsi Transfer & Kolom Upload Struk */}
                     <label className={`block p-4 rounded-2xl border-2 cursor-pointer transition-all ${paymentMethod === 'transfer' ? 'border-emerald-500 bg-emerald-50/50' : 'border-slate-100 hover:border-slate-200 bg-white'}`}>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-4">
@@ -191,7 +191,6 @@ export default function Checkout() {
                         <CreditCard className={`w-6 h-6 ${paymentMethod === 'transfer' ? 'text-emerald-500' : 'text-slate-300'}`} />
                       </div>
                       
-                      {/* Form Upload Muncul Jika Transfer Dipilih */}
                       {paymentMethod === 'transfer' && (
                         <div className="mt-4 pt-4 border-t border-emerald-100 animate-fade-in pl-9">
                           <p className="text-xs font-bold text-slate-700 mb-2">Silakan transfer ke BSI 1234567890 (a.n AgroMarina)</p>
@@ -207,16 +206,16 @@ export default function Checkout() {
                       )}
                     </label>
 
-                    <label className={`block p-4 rounded-2xl border-2 cursor-pointer transition-all ${paymentMethod === 'ewallet' ? 'border-emerald-500 bg-emerald-50/50' : 'border-slate-100 hover:border-slate-200 bg-white'}`}>
+                    <label className={`block p-4 rounded-2xl border-2 cursor-pointer transition-all ${paymentMethod === 'cod' ? 'border-emerald-500 bg-emerald-50/50' : 'border-slate-100 hover:border-slate-200 bg-white'}`}>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-4">
-                          <input type="radio" name="payment" value="ewallet" checked={paymentMethod === 'ewallet'} onChange={() => setPaymentMethod('ewallet')} className="w-5 h-5 text-emerald-600 focus:ring-emerald-500" />
+                          <input type="radio" name="payment" value="cod" checked={paymentMethod === 'cod'} onChange={() => setPaymentMethod('cod')} className="w-5 h-5 text-emerald-600 focus:ring-emerald-500" />
                           <div>
-                            <span className="font-bold text-slate-800 block">E-Wallet (QRIS)</span>
-                            <span className="text-xs text-slate-500">GoPay, OVO, Dana, LinkAja.</span>
+                            <span className="font-bold text-slate-800 block">Bayar di Tempat (COD)</span>
+                            <span className="text-xs text-slate-500">Bayar tunai saat barang tiba atau pekerjaan selesai.</span>
                           </div>
                         </div>
-                        <Wallet className={`w-6 h-6 ${paymentMethod === 'ewallet' ? 'text-emerald-500' : 'text-slate-300'}`} />
+                        <Banknote className={`w-6 h-6 ${paymentMethod === 'cod' ? 'text-emerald-500' : 'text-slate-300'}`} />
                       </div>
                     </label>
                   </div>
@@ -224,42 +223,65 @@ export default function Checkout() {
               )}
             </div>
 
-            {/* Kanan: Ringkasan Pesanan */}
+            {/* Kanan: Ringkasan Pesanan (Hanya Item Terpilih) */}
             <div className="w-full lg:w-1/3">
               <div className="bg-slate-900 rounded-3xl p-6 md:p-8 shadow-xl text-white sticky top-24">
                 <h3 className="font-bold text-lg mb-6 flex items-center justify-between border-b border-slate-700 pb-4">
                   <span>Ringkasan Belanja</span>
-                  <span className="text-emerald-400 text-sm">{cart.length} Item</span>
+                  <span className="text-emerald-400 text-sm">1 Item</span>
                 </h3>
 
-                <div className="space-y-4 mb-6 max-h-[300px] overflow-y-auto no-scrollbar pr-2">
-                  {cart.map(item => (
-                    <div key={item.id || item.name} className="flex justify-between items-start text-sm">
-                      <div className="flex-1 pr-4">
-                        <p className="font-semibold text-slate-200 line-clamp-1">{item.name}</p>
-                        <p className="text-slate-500 mt-0.5">{item.quantity || 1} {item.unit} x Rp {item.price.toLocaleString('id-ID')}</p>
+                {/* --- HANYA MENAMPILKAN ITEM YANG DIPILIH --- */}
+                <div className="space-y-4 mb-6">
+                  {activeItem ? (() => {
+                    const itemQty = activeItem.qty || 1;
+                    const itemDuration = activeItem.tipe === 'sewa' ? (activeItem.duration || 1) : 1;
+                    const unit = activeItem.unit || 'Item';
+                    
+                    const itemSubtotal = activeItem.tipe === 'sewa' 
+                      ? (activeItem.price * itemQty * itemDuration) 
+                      : (activeItem.price * itemQty);
+
+                    return (
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="text-white font-medium text-sm">{activeItem.name}</h4>
+                          <p className="text-slate-400 text-xs mt-1">
+                            {activeItem.tipe === 'sewa' 
+                              ? `${itemQty} Unit x ${itemDuration} Hari x Rp ${activeItem.price.toLocaleString('id-ID')}` 
+                              : activeItem.tipe === 'jasa'
+                                ? `${itemDuration} Hari x Rp ${activeItem.price.toLocaleString('id-ID')}`
+                                : `${itemQty} ${unit} x Rp ${activeItem.price.toLocaleString('id-ID')}`}
+                          </p>
+                        </div>
+                        <p className="text-white font-medium text-sm">Rp {itemSubtotal.toLocaleString('id-ID')}</p>
                       </div>
-                      <span className="font-bold text-slate-300 whitespace-nowrap">
-                        Rp {(item.price * (item.quantity || 1)).toLocaleString('id-ID')}
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })() : <p className="text-slate-400 text-xs">Belum ada item dipilih</p>}
                 </div>
 
-                <div className="border-t border-slate-700 pt-4 space-y-3 mb-6 text-sm">
+                {/* --- AREA RINCIAN TAGIHAN (Tanpa Kotak Total Harga Ganda di Tengah) --- */}
+                <div className="space-y-3 text-sm border-t border-slate-700 pt-6 mb-6">
+                  <span className="text-white font-bold block mb-3">Rincian Harga</span>
+                  
                   <div className="flex justify-between text-slate-400">
                     <span>Subtotal Harga</span>
                     <span>Rp {subTotal.toLocaleString('id-ID')}</span>
                   </div>
+                  
                   <div className="flex justify-between text-slate-400">
-                    <span>Ongkir Logistik Khusus</span>
+                    <span>
+                      {activeItem?.tipe === 'jasa' ? 'Biaya Transportasi' : 'Ongkir Logistik Khusus'}
+                    </span>
                     <span>Rp {shippingCost.toLocaleString('id-ID')}</span>
                   </div>
-                </div>
-
-                <div className="flex justify-between items-center mb-8 border-t border-slate-700 pt-4">
-                  <span className="font-bold text-slate-300">Total Tagihan</span>
-                  <span className="font-black text-2xl text-emerald-400">Rp {total.toLocaleString('id-ID')}</span>
+                  
+                  <div className="flex justify-between items-center pt-4 mt-4 border-t border-slate-700">
+                    <span className="text-white font-bold">Total Tagihan</span>
+                    <span className="text-emerald-400 font-black text-xl">
+                      Rp {total.toLocaleString('id-ID')}
+                    </span>
+                  </div>
                 </div>
 
                 <button 
@@ -281,7 +303,7 @@ export default function Checkout() {
             </div>
           </div>
         ) : (
-          
+        
           /* Step 3: Halaman Sukses */
           <div className="max-w-2xl mx-auto bg-white p-10 rounded-3xl border border-slate-200/60 shadow-xl text-center animate-slide-in">
             <div className="w-24 h-24 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -301,7 +323,7 @@ export default function Checkout() {
                 <div className="font-bold text-emerald-600 text-right">Rp {finalOrderInfo?.totalPaid.toLocaleString('id-ID')}</div>
                 <div className="text-slate-500">Metode</div>
                 <div className="font-bold text-slate-900 text-right capitalize">
-                  {finalOrderInfo?.method === 'escrow' ? 'Rekening Bersama' : finalOrderInfo?.method === 'transfer' ? 'Transfer Bank' : finalOrderInfo?.method}
+                  {finalOrderInfo?.method === 'escrow' ? 'Rekening Bersama' : finalOrderInfo?.method === 'transfer' ? 'Transfer Bank' : finalOrderInfo?.method === 'cod' ? 'Bayar di Tempat (COD)' : finalOrderInfo?.method}
                 </div>
               </div>
             </div>
